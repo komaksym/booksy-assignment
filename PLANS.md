@@ -14,7 +14,8 @@ The executable plan lives in
 
 - [Slice 1 shell/auth specification](docs/superpowers/specs/2026-07-22-slice-1-shell-auth-design.md) — approved functional and visual contract for the first PR.
 - [Slice 2 dirty-inventory specification](docs/superpowers/specs/2026-07-22-slice-2-dirty-inventory-design.md) — approved contract implemented on its review branch.
-- [Slice 3 safe-rental specification](docs/superpowers/specs/2026-07-22-slice-3-safe-rental-design.md) — approved design awaiting written-spec review.
+- [Slice 3 safe-rental specification](docs/superpowers/specs/2026-07-22-slice-3-safe-rental-design.md) — approved contract on its implementation branch.
+- [Slice 3 implementation plan](docs/superpowers/plans/2026-07-22-slice-3-safe-rental-implementation.md) — test-first task sequence for the approved rental design.
 - [Reference UI mockup](docs/assets/hardware-hub-reference-ui.png) — visual
   direction for Slice 1's shell and Slice 2's dashboard/admin screens. It is a
   styling and layout reference, not an expansion of the MVP feature scope.
