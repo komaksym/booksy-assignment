@@ -1,14 +1,14 @@
 # Hardware Hub
 
 A focused internal hardware-management tool built for Booksy's AI-Native Hardware
-Hub assessment. This branch contains **Slices 1 and 2**: authenticated access plus a
-server-rendered inventory that preserves malformed source data, derives objective
-findings, and lets administrators correct canonical values without rewriting the
-original evidence.
+Hub assessment. This branch contains **Slices 1 through 3**: authenticated access,
+a server-rendered inventory that preserves malformed source data, and guarded
+ordinary-user rental flows. Administrators can correct canonical values without
+rewriting the original evidence.
 
 The assignment calls for account creation by administrators, login restricted to
 those accounts, a tested core, transparent trade-offs, and an AI development log.
-Later reviewed slices add rental and the AI-native auditor.
+The later review-gated slice adds the AI-native auditor and release configuration.
 
 ## Run locally
 
@@ -40,7 +40,7 @@ runtime.
 
 ## Implementation status
 
-### Fully implemented through Slice 2
+### Fully implemented through Slice 3
 
 - FastAPI/Jinja application shell and public health endpoint.
 - Idempotent bootstrap administrator with Argon2 password hashing.
@@ -57,6 +57,14 @@ runtime.
 - Side-by-side source/canonical correction with legacy assignee redaction.
 - Ordinary-user views that omit canonical-null rows, findings, provenance, and admin controls.
 - Responsive sidebar/top navigation and table-scoped narrow-screen overflow.
+- Ordinary-user-only rent and owner-only return POST flows, with no JavaScript
+  requirement.
+- Multiple concurrent holdings for an ordinary user, with fresh `Available` state,
+  no holder, and no critical finding required to rent. Warning findings do not block
+  rental; returns are not finding-gated.
+- Append-only rental history: ordinary users see `You` or `Another user`, while
+  administrators see the resolved user email for application events. Missing actors
+  display as `Unknown user`; legacy assignee evidence remains redacted.
 
 ### Deliberate MVP shortcuts
 
@@ -74,7 +82,7 @@ runtime.
 - **Persistent initialization marker instead of migrations.** A marker prevents
   duplicate imports and prevents deleted rows from reappearing after restart. Production
   schema evolution would use an explicit migration system.
-- **Single-process TinyDB mutations.** Each route re-reads current state before one
+- **Single-worker TinyDB mutations.** Each route re-reads current state before one
   write, but there is no transaction or multi-worker guarantee. A production service
   would use a transactional database.
 - **Permanent hard deletion without a deletion log.** This directly satisfies the
@@ -84,15 +92,15 @@ runtime.
 
 ### Partial or missing by design
 
-Rent/return ownership, rental history, LLM auditing, and Railway deployment belong to
-later review-gated slices. Slice 2 intentionally contains no rental controls, audit
-page, fake metrics, pagination, JavaScript dependency, or inactive future navigation.
+LLM auditing and Railway deployment belong to the later review-gated Slice 4. Slice 3
+intentionally includes no administrator forced-return path or due dates, audit page,
+fake metrics, pagination, JavaScript dependency, or inactive future navigation.
 
 ### Next three priorities
 
-1. Add owner-aware rent/return history with deterministic safety gates.
-2. Add the read-only deterministic/LLM audit with provider-failure fallback.
-3. Document and validate Railway-ready single-worker deployment configuration.
+1. Add the read-only deterministic/LLM audit with provider-failure fallback.
+2. Document and validate Railway-ready single-worker deployment configuration.
+3. Complete the review-gated release handoff without expanding the rental model.
 
 ## AI development
 

@@ -78,3 +78,32 @@ Browser verification found no layout or redaction regression: the administrator 
 both source-ID `4` edit links, source `7` rendered only the redacted legacy-assignee
 label, source `10` retained blank/null/Unknown evidence after correction, and the
 390-pixel layout kept horizontal overflow inside the table container.
+
+## Slice 3 — guarded rental
+
+The approved rental boundary is deliberately narrow: active ordinary users can rent
+multiple items concurrently, but only from a freshly read available and unheld state
+without critical findings. Warnings remain non-blocking. Only the current holder can
+return an item; returns are not finding-gated. Administrators retain traceability
+through resolved application-user emails but cannot rent, return, or force a return.
+Due dates are not part of this slice.
+
+The work followed one test-first browser/storage journey, then bounded implementation
+tasks and independent review. The journey covers a critical rejection, warning-only
+rental, repeated-action no-write behavior, owner-only return, administrator denial,
+append-only UTC history, and privacy-aware rendering. Review first added safe
+detail-page POST controls; later review corrections prevented canonical-null values
+from leaking through ordinary-user dashboard options and projected dashboard rows so
+raw holder IDs, event data, timestamps, and other stored evidence never reach
+ordinary-user templates.
+
+Rental history is rendered newest first while the stored history remains append-only
+oldest first. Ordinary viewers see only `You` or `Another user`; administrators see
+resolved emails and `Unknown user` for a missing actor. Imported legacy assignee
+evidence remains unresolved and redacted. TinyDB is intentionally limited to a
+single-worker deployment: every route re-reads state before one update, without a
+transaction or multi-worker guarantee.
+
+The focused and full pytest runs retain the pre-existing FastAPI/Starlette TestClient
+deprecation warning. It is recorded as an existing dependency warning, not treated as
+new Slice 3 behavior or as validation failure.
