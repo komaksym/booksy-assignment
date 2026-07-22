@@ -22,7 +22,7 @@ from hardware_hub.db import open_db, users_table
 
 _PACKAGE_DIR = Path(__file__).parent
 _TEMPLATES = Jinja2Templates(directory=_PACKAGE_DIR / "templates")
-_SESSION_IDLE_TIMEOUT_SECONDS = 8 * 60 * 60
+_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -52,9 +52,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         SessionMiddleware,
         secret_key=runtime.session_secret,
-        # SessionMiddleware re-signs non-empty sessions on responses, so this is
-        # an inactivity timeout that refreshes while the user remains active.
-        max_age=_SESSION_IDLE_TIMEOUT_SECONDS,
+        # The locked Starlette version does not reissue unchanged sessions, so
+        # read-only activity does not refresh this absolute maximum lifetime.
+        max_age=_SESSION_MAX_AGE_SECONDS,
         same_site="strict",
         https_only=runtime.environment == "production",
     )
