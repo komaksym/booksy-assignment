@@ -232,7 +232,7 @@ def _parse_provider_response(
         if not isinstance(content, str) or not content.strip():
             raise ValueError("Missing content")
         parsed = LLMAuditResponse.model_validate_json(content)
-    except (KeyError, IndexError, TypeError, ValueError, ValidationError):
+    except (AttributeError, KeyError, IndexError, TypeError, ValueError, ValidationError):
         _LOGGER.warning("DeepSeek audit failed: invalid provider response")
         raise AuditUnavailableError from None
 
