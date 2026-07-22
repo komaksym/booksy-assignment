@@ -1,0 +1,62 @@
+name: Slice 4 implementation
+
+on:
+  push:
+    branches: [codex/04-audit-release]
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: codex/04-audit-release
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - name: Write audit behavior tests first
+        run: python .github/scripts/implement_slice4.py tests-only
+      - name: Confirm RED before production implementation
+        shell: bash
+        run: |
+          uv sync --locked
+          set +e
+          uv run pytest tests/test_audit.py -q > /tmp/slice4-red.log 2>&1
+          red_status=$?
+          set -e
+          cat /tmp/slice4-red.log
+          if [ "$red_status" -eq 0 ]; then
+            echo "Expected the new Slice 4 tests to fail before implementation."
+            exit 1
+          fi
+      - name: Apply approved Slice 4 implementation
+        run: python .github/scripts/implement_slice4.py implementation
+      - name: Regenerate and verify dependencies
+        run: |
+          uv lock
+          uv lock --check
+          uv sync --locked
+      - name: Format
+        run: uv run ruff format .
+      - name: Lint and test
+        run: |
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run pytest -q
+      - name: Build and inspect diff
+        run: |
+          uv build
+          git diff --check
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          rm .github/workflows/slice4-implementation.yml
+          rm .github/scripts/implement_slice4.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(audit): complete MVP handoff" -m "Adds the administrator-only deterministic and optional DeepSeek audit, strict allowlisted snapshot and atomic response validation, focused non-mutation/privacy coverage, consolidated assessment documentation, and one-worker Railway configuration. Live Railway and real-provider verification remain explicitly pending user-controlled access and secrets."
+          git push origin HEAD:codex/04-audit-release
