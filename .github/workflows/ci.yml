@@ -70,13 +70,11 @@ jobs:
           replace_once(
               dashboard,
               '        {% set statuses = ["Available", "In Use", "Repair", "Needs correction"] %}\n'
-              '        {% if filters.status and filters.status not in statuses %}\n',
-              '        {% if filters.status and filters.status not in status_choices %}\n',
-          )
-          replace_once(
-              dashboard,
-              "        {% for status in statuses %}\n",
-              "        {% for status in status_choices %}\n",
+              '        {% if filters.status and filters.status not in statuses %}\n'
+              '          <option value="{{ filters.status }}" selected>{{ filters.status }}</option>\n'
+              '        {% endif %}\n'
+              '        {% for status in statuses %}\n',
+              '        {% for status in status_choices %}\n',
           )
 
           Path(".github/workflows/task2-patch.yml").unlink()
