@@ -8,6 +8,16 @@ from typing import Literal
 _SUPPORTED_STATUSES = {"Available", "In Use", "Repair"}
 # Exact case-insensitive phrases that make an Available item a safety risk.
 _SAFETY_PHRASES = ("battery swelling", "liquid damage")
+_FINDING_MESSAGES = {
+    "DUPLICATE_SOURCE_ID": "Source ID appears on more than one hardware record.",
+    "FUTURE_PURCHASE_DATE": "Purchase date is in the future.",
+    "INVALID_PURCHASE_DATE": "Imported purchase date is not a strict YYYY-MM-DD value.",
+    "MISSING_PURCHASE_DATE": "Purchase date is missing.",
+    "MISSING_BRAND": "Brand is missing.",
+    "INVALID_STATUS": "Imported status is unsupported and has no canonical value.",
+    "UNRESOLVED_HOLDER": "Item is in use without an application-recognized holder.",
+    "SAFETY_RISK": "Available item contains safety-risk evidence and must not be issued.",
+}
 
 
 @dataclass(frozen=True)
@@ -18,6 +28,7 @@ class Finding:
     severity: Literal["warning", "critical"]
     hardware_id: str
     source_id: object | None
+    message: str
 
 
 def find_issues(records: list[dict[str, object]], today: date) -> tuple[Finding, ...]:
@@ -75,7 +86,7 @@ def _finding(
 ) -> Finding:
     """Construct one immutable finding value for a hardware item."""
 
-    return Finding(code, severity, hardware_id, source_id)
+    return Finding(code, severity, hardware_id, source_id, _FINDING_MESSAGES[code])
 
 
 def _is_strict_date(value: object) -> bool:

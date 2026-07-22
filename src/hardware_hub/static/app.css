@@ -790,3 +790,44 @@ tbody tr:last-child td {
     gap: 0.25rem;
   }
 }
+
+.audit-stack {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.audit-section,
+.audit-action-card {
+  min-width: 0;
+}
+
+.audit-action-card {
+  padding: 1.25rem;
+}
+
+.audit-action-card form {
+  margin: 1rem 0 0;
+}
+
+.audit-warning {
+  margin-top: 1rem;
+}
+
+.audit-message,
+.audit-recommendation {
+  min-width: 18rem;
+  white-space: normal;
+  line-height: 1.45;
+}
+
+.ai-finding {
+  border-color: #cfc8ee;
+  background: #f3f0ff;
+  color: #4a3785;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+

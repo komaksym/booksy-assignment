@@ -1,6 +1,6 @@
 # Slice 4 — Deterministic/DeepSeek Audit and Release Specification
 
-- **Status:** Written; awaiting user review
+- **Status:** Implemented locally; live Railway verification pending user-controlled access and secrets
 - **Branch:** `codex/04-audit-release`
 - **Depends on:** merged Slice 3 safe-rental implementation
 

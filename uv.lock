@@ -226,6 +226,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "itsdangerous" },
     { name = "jinja2" },
     { name = "pwdlib", extra = ["argon2"] },
@@ -245,6 +246,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.128,<0.140" },
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "itsdangerous", specifier = ">=2.2,<3" },
     { name = "jinja2", specifier = ">=3.1,<4" },
     { name = "pwdlib", extras = ["argon2"], specifier = ">=0.3,<1" },

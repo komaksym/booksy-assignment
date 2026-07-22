@@ -16,6 +16,7 @@ The executable plan lives in
 - [Slice 2 dirty-inventory specification](docs/superpowers/specs/2026-07-22-slice-2-dirty-inventory-design.md) — approved contract implemented on its review branch.
 - [Slice 3 safe-rental specification](docs/superpowers/specs/2026-07-22-slice-3-safe-rental-design.md) — approved contract on its implementation branch.
 - [Slice 3 implementation plan](docs/superpowers/plans/2026-07-22-slice-3-safe-rental-implementation.md) — test-first task sequence for the approved rental design.
+- [Slice 4 audit/release specification](docs/superpowers/specs/2026-07-23-slice-4-audit-release-design.md) — approved deterministic/DeepSeek audit and verified-release contract.
 - [Reference UI mockup](docs/assets/hardware-hub-reference-ui.png) — visual
   direction for Slice 1's shell and Slice 2's dashboard/admin screens. It is a
   styling and layout reference, not an expansion of the MVP feature scope.
@@ -26,8 +27,8 @@ The executable plan lives in
 | --- | --- | --- | --- |
 | 1 | `codex/01-shell-auth` | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | Merged |
 | 2 | `codex/02-dirty-inventory` | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Merged |
-| 3 | `codex/03-rental` | Guarded rent/return flow with ownership and visible history | PR ready |
-| 4 | `codex/04-audit-release` | Deterministic/LLM audit, honest documentation, manual smoke verification, and Railway-ready configuration | Blocked on Slice 3 merge |
+| 3 | `codex/03-rental` | Guarded rent/return flow with ownership and visible history | Merged |
+| 4 | `codex/04-audit-release` | Deterministic/DeepSeek audit, honest documentation, and one-worker Railway release | Implementation ready; live verification pending user-controlled access and secrets |
 
 No implementation duration, estimate, or timebox is part of this roadmap. Agents
 work until the slice definition of done is satisfied and the PR is ready for
@@ -110,6 +111,8 @@ These omissions are documented assessment trade-offs, not accidental gaps.
 
 ## Release Boundary
 
-Slice 4 produces Railway-ready configuration. External publication occurs only
-after explicit user approval. Repository visibility changes and Railway secrets
-remain user-controlled actions.
+The user approved the detailed Slice 4 implementation specification. The code and
+one-worker Railway contract can be completed on the review branch, but public
+verification still requires the user-controlled Railway project, volume, funded
+DeepSeek key, and sealed secrets. No URL or live success claim is recorded before
+those checks actually pass.
