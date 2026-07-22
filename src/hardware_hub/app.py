@@ -43,6 +43,14 @@ _PACKAGE_DIR = Path(__file__).parent
 _TEMPLATES = Jinja2Templates(directory=_PACKAGE_DIR / "templates")
 _SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
 _ORIGINAL_SOURCE_COUNT = 11
+_ORDINARY_STATUS_CHOICES = ("Available", "In Use", "Repair")
+_ADMIN_STATUS_CHOICES = (*_ORDINARY_STATUS_CHOICES, "Needs correction")
+
+
+def _status_choices(user: dict[str, Any]) -> tuple[str, ...]:
+    """Return the dashboard status filters available to the current role."""
+
+    return _ADMIN_STATUS_CHOICES if user["role"] == "admin" else _ORDINARY_STATUS_CHOICES
 
 
 def _dashboard_record(record: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
@@ -105,6 +113,7 @@ def _dashboard_context(
         "records": rows,
         "filters": filters,
         "brands": brands,
+        "status_choices": _status_choices(user),
         "error": error,
         "source_count": sum(record.get("source_id") is not None for record in all_records),
         "original_source_count": _ORIGINAL_SOURCE_COUNT,
@@ -439,6 +448,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         error = None
         response_status = status.HTTP_200_OK
         try:
+            if status_filter and status_filter not in _status_choices(user):
+                raise InventoryInputError("Choose a supported status filter")
             records = filter_and_sort(visible, **filters)
         except InventoryInputError as exc:
             error = str(exc)
