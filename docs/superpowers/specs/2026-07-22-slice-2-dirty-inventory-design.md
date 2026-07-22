@@ -235,9 +235,9 @@ occurrences: six warnings and five critical findings.
 | Finding | Active while | Clears when |
 | --- | --- | --- |
 | Duplicate source ID | A non-null immutable `source_id` occurs more than once. | One duplicate document is explicitly hard-deleted. |
-| Future purchase date | Canonical date is after `today`. | Canonical date becomes `today` or earlier. |
+| Future purchase date | Canonical strict date is after `today`. | Canonical date becomes null, `today`, or earlier. |
 | Invalid purchase date | Raw date is non-null, fails strict date validation, and canonical date is null. | Canonical date becomes valid. |
-| Missing purchase date | Raw date is absent/null and canonical date is null. | Canonical date becomes valid. |
+| Missing purchase date | Canonical date is null and the raw date is absent, null, or valid strict ISO. | Canonical date becomes valid. |
 | Missing brand | Canonical brand is null/blank. | Canonical brand becomes non-blank. |
 | Invalid status | Raw status is unsupported and canonical status is null. | Canonical status becomes `Available` or `Repair`. |
 | Unresolved holder | Canonical status is `In Use` and `holder_user_id` is null. | An administrator explicitly changes status to `Available` or `Repair`. |
@@ -248,6 +248,10 @@ swelling` or `liquid damage` in either immutable raw notes/history or editable
 notes/history. Clearing editable text cannot erase imported evidence. Marking an
 item `Repair` removes the unsafe-available condition; changing it back to
 `Available` makes the finding return.
+
+The date rules are mutually exhaustive: a valid canonical date suppresses both
+invalid and missing findings, while every null canonical date produces exactly
+one of those findings based on whether the non-null raw date is invalid.
 
 `Appel` is not objectively provable as a typo, and source IDs are not required to
 be contiguous. Therefore neither `Appel` nor missing source ID `8` produces a

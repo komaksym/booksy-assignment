@@ -46,10 +46,15 @@ def find_issues(records: list[dict[str, object]], today: date) -> tuple[Finding,
             findings.append(_finding("DUPLICATE_SOURCE_ID", "warning", hardware_id, source_id))
         if _is_after_today(purchase_date, today):
             findings.append(_finding("FUTURE_PURCHASE_DATE", "warning", hardware_id, source_id))
-        if raw_date is not None and not _is_strict_date(raw_date) and purchase_date is None:
-            findings.append(_finding("INVALID_PURCHASE_DATE", "warning", hardware_id, source_id))
-        if raw_date is None and purchase_date is None:
-            findings.append(_finding("MISSING_PURCHASE_DATE", "warning", hardware_id, source_id))
+        if purchase_date is None:
+            if raw_date is not None and not _is_strict_date(raw_date):
+                findings.append(
+                    _finding("INVALID_PURCHASE_DATE", "warning", hardware_id, source_id)
+                )
+            else:
+                findings.append(
+                    _finding("MISSING_PURCHASE_DATE", "warning", hardware_id, source_id)
+                )
         if not isinstance(record.get("brand"), str) or not record["brand"].strip():
             findings.append(_finding("MISSING_BRAND", "warning", hardware_id, source_id))
         if raw_status not in _SUPPORTED_STATUSES and status is None:

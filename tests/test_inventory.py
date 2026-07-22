@@ -12,6 +12,8 @@ def test_admin_inventory_writes_preserve_raw_evidence(client, app: FastAPI) -> N
     hardware = app.state.hardware
     source_ten = hardware.get(Query().source_id == 10)
     assert source_ten is not None
+    source_six = hardware.get(Query().source_id == 6)
+    assert source_six is not None
 
     internal_id = source_ten["id"]
     raw_payload = deepcopy(source_ten["raw_payload"])
@@ -99,3 +101,29 @@ def test_admin_inventory_writes_preserve_raw_evidence(client, app: FastAPI) -> N
         5,
         11,
     }
+
+    response = client.post(
+        f"/admin/hardware/{source_six['id']}/edit",
+        data={
+            "name": source_six["name"],
+            "brand": source_six["brand"],
+            "purchase_date": "",
+            "status": source_six["status"],
+            "notes": source_six["notes"],
+            "legacy_history": source_six["legacy_history"],
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    cleared = hardware.get(Query().source_id == 6)
+    assert cleared is not None
+    assert cleared["raw_payload"]["purchaseDate"] == "2027-10-10"
+    assert cleared["purchase_date"] is None
+
+    source_six_findings = [
+        finding
+        for finding in find_issues(hardware.all(), date(2026, 7, 22))
+        if finding.source_id == 6
+    ]
+    assert [finding.code for finding in source_six_findings] == ["MISSING_PURCHASE_DATE"]

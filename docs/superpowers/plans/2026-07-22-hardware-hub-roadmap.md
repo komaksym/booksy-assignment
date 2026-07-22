@@ -342,9 +342,9 @@ Use this trigger/clear contract; do not invent stored resolution state:
 | Finding | Trigger and clear rule |
 | --- | --- |
 | duplicate | count immutable non-null `source_id`; only explicit deletion changes it |
-| future date | canonical date is after `today`; a corrected non-future date clears it |
+| future date | canonical strict date is after `today`; a null or corrected non-future date clears it |
 | invalid date | non-null raw date is not strict ISO and canonical date is null; a valid canonical date clears it |
-| missing date | raw date is absent/null and canonical date is null; a valid canonical date clears it |
+| missing date | canonical date is null and raw date is absent, null, or valid strict ISO; a valid canonical date clears it |
 | missing brand | canonical brand is null/blank; a non-blank canonical brand clears it |
 | invalid status | raw status is unsupported and canonical status is null; a supported canonical status clears it |
 | unresolved holder | canonical status is `In Use` and holder is null; an explicit admin status correction clears it |
