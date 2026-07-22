@@ -13,7 +13,7 @@ The executable plan lives in
 ## Artifacts
 
 - [Slice 1 shell/auth specification](docs/superpowers/specs/2026-07-22-slice-1-shell-auth-design.md) — approved functional and visual contract for the first PR.
-- [Slice 2 dirty-inventory specification](docs/superpowers/specs/2026-07-22-slice-2-dirty-inventory-design.md) — approved design contract awaiting written-spec review.
+- [Slice 2 dirty-inventory specification](docs/superpowers/specs/2026-07-22-slice-2-dirty-inventory-design.md) — approved contract implemented on its review branch.
 - [Reference UI mockup](docs/assets/hardware-hub-reference-ui.png) — visual
   direction for Slice 1's shell and Slice 2's dashboard/admin screens. It is a
   styling and layout reference, not an expansion of the MVP feature scope.
@@ -23,7 +23,7 @@ The executable plan lives in
 | Slice | Branch | Reviewable outcome | Status |
 | --- | --- | --- | --- |
 | 1 | `codex/01-shell-auth` | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | Merged |
-| 2 | `codex/02-dirty-inventory` | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Specification ready for review |
+| 2 | `codex/02-dirty-inventory` | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Implementation ready for PR review |
 | 3 | `codex/03-rental` | Guarded rent/return flow with ownership and visible history | Blocked on Slice 2 merge |
 | 4 | `codex/04-audit-release` | Deterministic/LLM audit, honest documentation, manual smoke verification, and Railway-ready configuration | Blocked on Slice 3 merge |
 

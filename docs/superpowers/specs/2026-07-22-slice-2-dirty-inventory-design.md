@@ -1,6 +1,6 @@
 # Slice 2 — Dirty Inventory Specification
 
-- **Status:** Design approved; awaiting written-spec review
+- **Status:** Implemented; awaiting pull-request review
 - **Branch:** `codex/02-dirty-inventory`
 - **Reference:** [Hardware Hub UI mockup](../../assets/hardware-hub-reference-ui.png)
 
