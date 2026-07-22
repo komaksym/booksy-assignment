@@ -20,14 +20,18 @@ jobs:
       - run: uv sync --locked
       - name: Apply canonical formatting
         run: uv run ruff format .
-      - name: Verify source and behavior
-        run: |
-          uv lock --check
-          uv run ruff format --check .
-          uv run ruff check .
-          uv run pytest -q
-          uv build
-          git diff --check
+      - name: Check lockfile
+        run: uv lock --check
+      - name: Check formatting
+        run: uv run ruff format --check .
+      - name: Lint
+        run: uv run ruff check .
+      - name: Test
+        run: uv run pytest -q
+      - name: Build
+        run: uv build
+      - name: Check diff
+        run: git diff --check
       - name: Commit verified repair
         run: |
           rm .github/workflows/slice4-repair.yml
