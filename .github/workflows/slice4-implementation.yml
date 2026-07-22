@@ -1,6 +1,8 @@
 name: Slice 4 implementation
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [codex/04-audit-release]
 
@@ -19,6 +21,30 @@ jobs:
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - name: Write audit behavior tests first
         run: python .github/scripts/implement_slice4.py tests-only
+      - name: Correct generated access matrix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/test_audit.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''    for method in (client.get, client.post):
+              response = method("/admin/audit" if method is client.get else "/admin/audit/llm", follow_redirects=False)
+              assert response.status_code == 303
+              assert response.headers["location"] == "/login"
+          '''
+          new = '''    for method, route in (
+              (client.get, "/admin/audit"),
+              (client.post, "/admin/audit/llm"),
+          ):
+              response = method(route, follow_redirects=False)
+              assert response.status_code == 303
+              assert response.headers["location"] == "/login"
+          '''
+          if old not in text:
+              raise SystemExit("Expected generated access matrix was not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
       - name: Confirm RED before production implementation
         shell: bash
         run: |
@@ -55,6 +81,7 @@ jobs:
         run: |
           rm .github/workflows/slice4-implementation.yml
           rm .github/scripts/implement_slice4.py
+          rm .github/slice4-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
