@@ -17,16 +17,16 @@ jobs:
           ref: codex/01-shell-auth
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - name: Generate lockfile
-        run: uv lock
+        run: |
+          rm uv.lock
+          uv lock
       - name: Commit generated lockfile
         run: |
-          if ! git diff --quiet -- uv.lock; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add uv.lock
-            git commit -m "build(deps): regenerate uv lockfile"
-            git push
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add uv.lock
+          git commit -m "build(deps): regenerate uv lockfile"
+          git push
       - run: uv sync --locked
       - run: uv run ruff format --check .
       - run: uv run ruff check .
