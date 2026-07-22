@@ -28,22 +28,16 @@ jobs:
 
           path = Path("tests/test_audit.py")
           text = path.read_text(encoding="utf-8")
-          old = '''    for method in (client.get, client.post):
-              response = method("/admin/audit" if method is client.get else "/admin/audit/llm", follow_redirects=False)
-              assert response.status_code == 303
-              assert response.headers["location"] == "/login"
-          '''
-          new = '''    for method, route in (
+          start = text.index("    for method in (client.get, client.post):")
+          end = text.index("\n\n    calls = 0", start)
+          replacement = '''    for method, route in (
               (client.get, "/admin/audit"),
               (client.post, "/admin/audit/llm"),
           ):
               response = method(route, follow_redirects=False)
               assert response.status_code == 303
-              assert response.headers["location"] == "/login"
-          '''
-          if old not in text:
-              raise SystemExit("Expected generated access matrix was not found")
-          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+              assert response.headers["location"] == "/login"'''
+          path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
           PY
       - name: Confirm RED before production implementation
         shell: bash
