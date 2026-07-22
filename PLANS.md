@@ -21,7 +21,7 @@ The executable plan lives in
 
 | Slice | Branch | Reviewable outcome | Status |
 | --- | --- | --- | --- |
-| 1 | `codex/01-shell-auth` | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | Not started |
+| 1 | `codex/01-shell-auth` | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | In review — CI passing |
 | 2 | `codex/02-dirty-inventory` | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Blocked on Slice 1 merge |
 | 3 | `codex/03-rental` | Guarded rent/return flow with ownership and visible history | Blocked on Slice 2 merge |
 | 4 | `codex/04-audit-release` | Deterministic/LLM audit, honest documentation, manual smoke verification, and Railway-ready configuration | Blocked on Slice 3 merge |

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Users · Hardware Hub{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div>
+      <p class="eyebrow">Administration</p>
+      <h1>User access</h1>
+      <p class="muted">Accounts can only be created here by an administrator.</p>
+    </div>
+  </header>
+
+  <div class="admin-grid">
+    <section class="card form-card" aria-labelledby="create-user-title">
+      <h2 id="create-user-title">Create user</h2>
+      {% if error %}
+        <p class="alert" role="alert">{{ error }}</p>
+      {% endif %}
+      <form class="form-stack" method="post" action="/admin/users">
+        <label>
+          <span>Email</span>
+          <input type="email" name="email" value="{{ email }}" autocomplete="off" required>
+        </label>
+        <label>
+          <span>Initial password</span>
+          <input type="password" name="password" minlength="8" autocomplete="new-password" required>
+        </label>
+        <button class="button button-primary" type="submit">Create account</button>
+      </form>
+    </section>
+
+    <section class="card table-card" aria-labelledby="user-list-title">
+      <div class="table-heading">
+        <h2 id="user-list-title">Current users</h2>
+        <span>{{ users | length }} total</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Active</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for account in users %}
+              <tr>
+                <td>{{ account.email }}</td>
+                <td>{{ account.role }}</td>
+                <td>{{ "Yes" if account.active else "No" }}</td>
+                <td><time datetime="{{ account.created_at }}">{{ account.created_at[:10] }}</time></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+{% endblock %}

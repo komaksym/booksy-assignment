@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Sign in · Hardware Hub{% endblock %}
+{% block shell_class %}login-shell{% endblock %}
+{% block content %}
+  <section class="card login-card" aria-labelledby="login-title">
+    <div class="login-brand">
+      <span class="wordmark-mark" aria-hidden="true">H</span>
+      <span>Hardware Hub</span>
+    </div>
+    <div>
+      <h1 id="login-title">Welcome back</h1>
+      <p class="muted">Sign in with an account created by an administrator.</p>
+    </div>
+    {% if error %}
+      <p class="alert" role="alert">{{ error }}</p>
+    {% endif %}
+    <form class="form-stack" method="post" action="/login">
+      <label>
+        <span>Email</span>
+        <input type="email" name="email" value="{{ email }}" autocomplete="username" required autofocus>
+      </label>
+      <label>
+        <span>Password</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <button class="button button-primary button-full" type="submit">Sign in</button>
+    </form>
+  </section>
+{% endblock %}
