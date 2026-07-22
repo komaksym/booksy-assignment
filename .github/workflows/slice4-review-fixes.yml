@@ -1,8 +1,8 @@
 name: Slice 4 review fixes
 
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches: [codex/04-audit-release]
 
 permissions:
   contents: write
@@ -114,6 +114,7 @@ def test_unexpected_or_incomplete_provider_envelope_falls_back(
       - name: Commit verified review corrections
         run: |
           rm .github/workflows/slice4-review-fixes.yml
+          rm .github/slice4-review-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
