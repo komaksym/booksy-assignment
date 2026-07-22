@@ -1,6 +1,6 @@
 # Slice 3 — Safe Rent/Return and History Specification
 
-- **Status:** Written; awaiting specification review
+- **Status:** Approved; implementation complete; PR-ready
 - **Branch:** `codex/03-rental`
 - **Depends on:** merged Slice 2 inventory and deterministic findings
 
