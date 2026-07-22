@@ -22,5 +22,12 @@
         {{ record.status }}
       </span>
     </p>
+    {% if circulation.action %}
+      <form method="post" action="/hardware/{{ record.id }}/{{ circulation.action }}">
+        <button class="button button-primary" type="submit">{{ circulation.action | title }}</button>
+      </form>
+    {% elif circulation.reason %}
+      <p class="muted">{{ circulation.reason }}</p>
+    {% endif %}
   </section>
 {% endblock %}

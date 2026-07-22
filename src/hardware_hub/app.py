@@ -203,6 +203,30 @@ def _visible_hardware(hardware: Any, user: dict[str, Any], internal_id: str) -> 
     return record
 
 
+def _circulation_action(
+    record: dict[str, Any], user: dict[str, Any], all_records: list[dict[str, Any]]
+) -> dict[str, str | None]:
+    """Return the safe, presentation-only circulation action or reason for one item."""
+
+    if user["role"] != "user":
+        return {"action": None, "reason": None}
+    if record.get("status") == "Available" and record.get("holder_user_id") is None:
+        blocked = any(
+            finding.hardware_id == record["id"] and finding.severity == "critical"
+            for finding in find_issues(all_records, date.today())
+        )
+        if blocked:
+            return {"action": None, "reason": "Blocked by safety check"}
+        return {"action": "rent", "reason": None}
+    if record.get("status") == "In Use" and record.get("holder_user_id") == user["id"]:
+        return {"action": "return", "reason": None}
+    if record.get("status") == "In Use" and record.get("holder_user_id") is not None:
+        return {"action": None, "reason": "Currently rented"}
+    if record.get("status") == "Repair":
+        return {"action": None, "reason": "Under repair"}
+    return {"action": None, "reason": "Unavailable"}
+
+
 def _detail_response(
     request: Request,
     user: dict[str, Any],
@@ -214,10 +238,11 @@ def _detail_response(
     """Render a fresh canonical hardware detail response."""
 
     record = _visible_hardware(request.app.state.hardware, user, internal_id)
+    circulation = _circulation_action(record, user, request.app.state.hardware.all())
     return _TEMPLATES.TemplateResponse(
         request=request,
         name="hardware_detail.html",
-        context={"user": user, "record": record, "error": error},
+        context={"user": user, "record": record, "circulation": circulation, "error": error},
         status_code=status_code,
     )
 

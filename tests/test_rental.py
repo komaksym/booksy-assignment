@@ -35,6 +35,16 @@ def test_rent_and_return_enforce_safety_ownership_and_history(client, app: FastA
 
     _login(client, first_user["email"])
 
+    response = client.get(f"/hardware/{source_one['id']}")
+    assert response.status_code == 200
+    assert f'<form method="post" action="/hardware/{source_one["id"]}/rent">' in response.text
+
+    response = client.get(f"/hardware/{source_five['id']}")
+    assert response.status_code == 200
+    assert f"/hardware/{source_five['id']}/rent" not in response.text
+    assert "Blocked by safety check" in response.text
+    assert "Battery swelling" not in response.text
+
     blocked_before = deepcopy(source_five)
     response = client.post(f"/hardware/{source_five['id']}/rent", follow_redirects=False)
     assert response.status_code == 409
@@ -53,6 +63,10 @@ def test_rent_and_return_enforce_safety_ownership_and_history(client, app: FastA
     assert datetime.fromisoformat(rented["updated_at"]).utcoffset() == timedelta(0)
     assert rented["updated_at"] == rented["rental_history"][0]["occurred_at"]
     _assert_unrelated_fields_unchanged(source_one_before_rent, rented)
+
+    response = client.get(f"/hardware/{source_one['id']}")
+    assert response.status_code == 200
+    assert f'<form method="post" action="/hardware/{source_one["id"]}/return">' in response.text
 
     repeated_rent_before = deepcopy(rented)
     response = client.post(f"/hardware/{source_one['id']}/rent", follow_redirects=False)
@@ -79,6 +93,10 @@ def test_rent_and_return_enforce_safety_ownership_and_history(client, app: FastA
         follow_redirects=False,
     )
     assert response.status_code == 303
+    response = client.get(f"/hardware/{source_one['id']}")
+    assert response.status_code == 200
+    assert f"/hardware/{source_one['id']}/rent" not in response.text
+    assert f"/hardware/{source_one['id']}/return" not in response.text
     for action in ("rent", "return"):
         admin_before = deepcopy(hardware.get(Query().id == source_one["id"]))
         response = client.post(f"/hardware/{source_one['id']}/{action}", follow_redirects=False)
