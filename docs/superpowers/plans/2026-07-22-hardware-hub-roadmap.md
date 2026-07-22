@@ -3,7 +3,7 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship one reviewable vertical hardware-management product in four pull
-requests and a nominal five hours of implementation time.
+requests.
 
 **Architecture:** FastAPI renders Jinja pages, TinyDB persists one JSON file, and
 small feature modules contain authentication, inventory rules, rental mutations,
@@ -23,17 +23,16 @@ administrator, and block objectively unsafe rentals. Do not spend the assignment
 building session storage, CSRF infrastructure, migrations, locking, an LLM gateway,
 or a browser-test harness.
 
-| Slice | Branch | Code budget | Browser-visible outcome |
-| --- | --- | ---: | --- |
-| 1 | `codex/01-shell-auth` | 80m | App shell, login, admin-created users, visual foundation, minimal CI |
-| 2 | `codex/02-dirty-inventory` | 90m | Exact dirty import, findings, dashboard, admin CRUD/correction |
-| 3 | `codex/03-rental` | 55m | Safe rent/return, ownership, history |
-| 4 | `codex/04-audit-release` | 75m | Deterministic/LLM audit, honest README, Railway-ready config |
+| Slice | Branch | Browser-visible outcome |
+| --- | --- | --- |
+| 1 | `codex/01-shell-auth` | App shell, login, admin-created users, visual foundation, minimal CI |
+| 2 | `codex/02-dirty-inventory` | Exact dirty import, findings, dashboard, admin CRUD/correction |
+| 3 | `codex/03-rental` | Safe rent/return, ownership, history |
+| 4 | `codex/04-audit-release` | Deterministic/LLM audit, honest README, Railway-ready config |
 
-The 300 minutes cover implementation, local validation, and PR preparation. User
-review, CI queues, dependency downloads, and Railway provisioning are external
-latency. Stop at each review gate; do not start the next branch before the current
-PR is approved and merged.
+This plan assigns no implementation estimates or timeboxes. Agents continue until
+the current slice meets its definition of done, then stop at the review gate. Do
+not start the next branch before the current PR is approved and merged.
 
 ```mermaid
 flowchart LR
@@ -112,7 +111,6 @@ trade-offs belong in the README; they do not need infrastructure in code.
 ## Slice 1 — App Shell, Authentication, UI Foundation, and CI
 
 - **Branch:** `codex/01-shell-auth`
-- **Timebox:** 80 minutes
 - **Outcome:** A bootstrap administrator can log in, create an ordinary user, and
   prove that the user can log in while admin routes remain protected.
 
@@ -159,7 +157,7 @@ GET  /admin/users            admin only
 POST /admin/users            admin only; creates active user
 ```
 
-### Task 1.1 — Scaffold the runnable service (0–15m)
+### Task 1.1 — Scaffold the runnable service
 
 - [ ] Create `pyproject.toml` with Slice 1 runtime dependencies only: FastAPI,
       Uvicorn, Jinja2, TinyDB, Pydantic Settings, pwdlib with Argon2,
@@ -179,7 +177,7 @@ POST /admin/users            admin only; creates active user
       `uv run uvicorn --app-dir src hardware_hub.app:app --reload` long enough to
       verify `/health`.
 
-### Task 1.2 — Write the authentication behavior first (15–25m)
+### Task 1.2 — Write the authentication behavior first
 
 - [ ] Add the shared temporary-database/settings/TestClient fixture in
       `tests/conftest.py`.
@@ -192,7 +190,7 @@ POST /admin/users            admin only; creates active user
 uv run pytest tests/test_auth.py -q
 ```
 
-### Task 1.3 — Implement the smallest authentication flow (25–55m)
+### Task 1.3 — Implement the smallest authentication flow
 
 - [ ] Hash bootstrap and new-user passwords with Argon2 through pwdlib.
 - [ ] Bootstrap the first administrator only when no administrator exists; normalize
@@ -208,7 +206,7 @@ uv run pytest tests/test_auth.py -q
 - [ ] Run the auth test until it passes. Confirm the application stores only
       `user_id` in the session mapping.
 
-### Task 1.4 — Establish the visual language (55–68m)
+### Task 1.4 — Establish the visual language
 
 - [ ] Build one compact header with the wordmark, current identity, administrator
       link when applicable, POST logout, error region, and content width. Do not
@@ -220,7 +218,7 @@ uv run pytest tests/test_auth.py -q
       a component library, animation system, dark mode, or mockup phase.
 - [ ] Manually check the pages at desktop width and approximately 390px width.
 
-### Task 1.5 — Add minimal CI and open PR 1 (68–80m)
+### Task 1.5 — Add minimal CI and open PR 1
 
 - [ ] Add one GitHub Actions job containing only the four minimal-gate commands.
 - [ ] Run the full gate and fix every failure.
@@ -255,7 +253,6 @@ out; logout works; narrow layout does not require horizontal page scrolling.
 ## Slice 2 — Lossless Dirty Seed, Findings, Dashboard, and Admin CRUD
 
 - **Branch:** `codex/02-dirty-inventory`
-- **Timebox:** 90 minutes
 - **Outcome:** The browser visibly proves that all malformed source records
   survived, and an administrator can correct canonical data without erasing the
   evidence.
@@ -352,7 +349,7 @@ Use this trigger/clear contract; do not invent stored resolution state:
 | unresolved holder | canonical status is `In Use` and holder is null; an explicit admin status correction clears it |
 | safety | canonical status is `Available` and immutable raw or current notes/history has battery-swelling or liquid-damage evidence; making it unavailable clears it, while seeded evidence cannot be edited away |
 
-### Task 2.1 — Write the dirty-data contract first (0–15m)
+### Task 2.1 — Write the dirty-data contract first
 
 - [ ] In `tests/test_seed.py`, write
       `test_seed_import_is_lossless_idempotent_and_reports_exact_findings`.
@@ -363,7 +360,7 @@ Use this trigger/clear contract; do not invent stored resolution state:
       explicitly that neither `Appel` nor the ID gap produces a finding.
 - [ ] Run this one test and confirm it fails before implementation.
 
-### Task 2.2 — Implement atomic-enough import and pure findings (15–35m)
+### Task 2.2 — Implement atomic-enough import and pure findings
 
 - [ ] Load and validate that the fixture root is a list of 11 dictionaries before
       opening the write path. Never key the list by source ID.
@@ -376,7 +373,7 @@ Use this trigger/clear contract; do not invent stored resolution state:
       is `In Use` while `holder_user_id` is null; never match `assignedTo` to a user.
 - [ ] Run the seed test until it passes.
 
-### Task 2.3 — Write the admin correction/CRUD behavior first (35–45m)
+### Task 2.3 — Write the admin correction/CRUD behavior first
 
 - [ ] In `tests/test_inventory.py`, write
       `test_admin_inventory_writes_preserve_raw_evidence` as one browser-level HTTP
@@ -387,7 +384,7 @@ Use this trigger/clear contract; do not invent stored resolution state:
       `"Unknown"`, identity, and row count remain unchanged.
 - [ ] Run this one test and confirm it fails before route implementation.
 
-### Task 2.4 — Build the server-rendered inventory slice (45–75m)
+### Task 2.4 — Build the server-rendered inventory slice
 
 - [ ] Add authenticated dashboard filtering and sorting for name, brand, purchase
       date, and status. Accept only an allowlist of sort keys.
@@ -411,7 +408,7 @@ Use this trigger/clear contract; do not invent stored resolution state:
       depends on JavaScript.
 - [ ] Run both inventory tests until they pass.
 
-### Task 2.5 — Validate and open PR 2 (75–90m)
+### Task 2.5 — Validate and open PR 2
 
 - [ ] Run the full minimal gate and manually execute the correction journey below.
 - [ ] Have the read-only reviewer search specifically for silent-loss traps:
@@ -453,7 +450,6 @@ canonical-null row or mutation controls.
 ## Slice 3 — Safe Rent/Return and History
 
 - **Branch:** `codex/03-rental`
-- **Timebox:** 55 minutes
 - **Outcome:** An ordinary user can rent a safe available item and return only their
   own rental; every accepted action becomes visible history.
 
@@ -487,7 +483,7 @@ Use an `async` route whose synchronous re-read/validate/update helper contains n
 `await`, and run one Uvicorn worker. This narrows the obvious race window but does
 not claim transactional concurrency.
 
-### Task 3.1 — Write the full rental journey first (0–12m)
+### Task 3.1 — Write the full rental journey first
 
 - [ ] In `tests/test_rental.py`, write
       `test_rent_and_return_enforce_safety_ownership_and_history`.
@@ -496,7 +492,7 @@ not claim transactional concurrency.
       ordered rent/return events contain the correct user IDs.
 - [ ] Run the test and confirm it fails before implementation.
 
-### Task 3.2 — Implement one mutation path (12–32m)
+### Task 3.2 — Implement one mutation path
 
 - [ ] In `rental.py`, implement small domain helpers that take a freshly loaded
       record and deterministic findings, returning either one complete replacement
@@ -509,7 +505,7 @@ not claim transactional concurrency.
       the canonical status through Slice 2; never auto-link an email to an account.
 - [ ] Run the rental test until it passes.
 
-### Task 3.3 — Expose actions and history (32–43m)
+### Task 3.3 — Expose actions and history
 
 - [ ] Add contextual rent/return forms to the dashboard and detail page, with clear
       disabled reasons when an item is unsafe or unavailable.
@@ -518,7 +514,7 @@ not claim transactional concurrency.
 - [ ] Verify every state-changing control is a POST form and still works without
       HTMX.
 
-### Task 3.4 — Validate and open PR 3 (43–55m)
+### Task 3.4 — Validate and open PR 3
 
 - [ ] Run the complete minimal gate and the manual two-user journey.
 - [ ] Have the read-only reviewer check server-side ownership, fresh re-read,
@@ -553,7 +549,6 @@ after editable notes are cleared; admin inventory controls still work.
 ## Slice 4 — Deterministic/LLM Audit, Documentation, and Railway Readiness
 
 - **Branch:** `codex/04-audit-release`
-- **Timebox:** 75 minutes of implementation; external deployment latency excluded
 - **Outcome:** Administrators receive deterministic findings with an optional LLM
   second opinion, and a reviewer can run or deploy the Railway-ready product from
   honest docs.
@@ -609,7 +604,7 @@ ID is not in the submitted snapshot. Missing config, transport errors, non-JSON,
 or schema errors become one visible warning. Deterministic findings remain intact,
 and no audit path writes to inventory.
 
-### Task 4.1 — Write fallback/non-mutation behavior first (0–12m)
+### Task 4.1 — Write fallback/non-mutation behavior first
 
 - [ ] In `tests/test_audit.py`, write
       `test_audit_falls_back_without_mutating_inventory`.
@@ -620,7 +615,7 @@ and no audit path writes to inventory.
       password hash, secret, cookie, or raw `assignedTo` value.
 - [ ] Run the test and confirm it fails before implementation.
 
-### Task 4.2 — Implement the read-only audit (12–35m)
+### Task 4.2 — Implement the read-only audit
 
 - [ ] Implement deterministic audit rendering first by reusing `find_issues`; do not
       duplicate rule logic.
@@ -633,7 +628,7 @@ and no audit path writes to inventory.
       deterministic and which are suggestions.
 - [ ] Run the audit test until it passes.
 
-### Task 4.3 — Write the assessment README (35–50m)
+### Task 4.3 — Write the assessment README
 
 - [ ] Document prerequisites, `uv sync --locked`, environment variables, startup,
       bootstrap login, tests, and the four-step manual product journey.
@@ -645,7 +640,7 @@ and no audit path writes to inventory.
       non-authority, and lack of automated browser tests.
 - [ ] Do not claim a live URL, passed check, or production guarantee until verified.
 
-### Task 4.4 — Add the narrow Railway contract (50–60m)
+### Task 4.4 — Add the narrow Railway contract
 
 - [ ] Configure one service command:
 
@@ -658,7 +653,7 @@ uv run uvicorn --app-dir src hardware_hub.app:app --host 0.0.0.0 --port $PORT --
 - [ ] Do not add a runtime `/data` path guard, backup automation, deploy workflow,
       multiple replicas, or automatic secret creation.
 
-### Task 4.5 — Validate and open PR 4 (60–75m)
+### Task 4.5 — Validate and open PR 4
 
 - [ ] Run the full minimal gate from a clean environment and perform the entire
       manual smoke path: bootstrap login → create user → inspect/correct dirty data
@@ -686,8 +681,7 @@ flowchart LR
     Railway["1 worker + /data volume"] --> App["FastAPI MVP"]
 ```
 
-- [ ] Wait for explicit user approval before publishing externally. Railway build,
-      provisioning, and URL verification do not consume the five-hour coding budget.
+- [ ] Wait for explicit user approval before publishing externally.
 - [ ] After approved publication, verify `/health`, log in, perform one safe
       rent/return, exercise the LLM once if credentials were supplied, redeploy once,
       and confirm the data persists. Record only verified results and URL in the PR.
@@ -701,9 +695,9 @@ truthful.
 
 ---
 
-## Ruthless Scope-Cut Order
+## Scope Priorities
 
-If a slice approaches its timebox, cut in this order:
+If the user explicitly chooses to reduce scope, cut in this order:
 
 1. extra spacing, color, and responsive polish;
 2. HTMX replacement behavior—full-page Jinja flows remain authoritative;

@@ -2,10 +2,10 @@
 
 ## Objective
 
-Build a working internal hardware-management product within a nominal five-hour
-implementation budget. The submission should demonstrate a complete user
-journey, sound handling of unreliable source data, and an honest explanation of
-shortcuts. It should not attempt to resemble a production platform.
+Build a focused internal hardware-management product. The submission should
+demonstrate a complete user journey, sound handling of unreliable source data,
+and an honest explanation of shortcuts. It should not attempt to resemble a
+production platform.
 
 ## Product Thesis
 

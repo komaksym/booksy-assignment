@@ -1,4 +1,4 @@
-# Hardware Hub Five-Hour Roadmap
+# Hardware Hub Delivery Roadmap
 
 ## Delivery Principle
 
@@ -19,18 +19,16 @@ The executable plan lives in
 
 ## Pull Request Sequence
 
-| Slice | Branch | Target | Reviewable outcome | Status |
-| --- | --- | ---: | --- | --- |
-| 1 | `codex/01-shell-auth` | 80m | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | Not started |
-| 2 | `codex/02-dirty-inventory` | 90m | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Blocked on Slice 1 merge |
-| 3 | `codex/03-rental` | 55m | Guarded rent/return flow with ownership and visible history | Blocked on Slice 2 merge |
-| 4 | `codex/04-audit-release` | 75m | Deterministic/LLM audit, honest documentation, manual smoke verification, and Railway-ready configuration | Blocked on Slice 3 merge |
+| Slice | Branch | Reviewable outcome | Status |
+| --- | --- | --- | --- |
+| 1 | `codex/01-shell-auth` | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | Not started |
+| 2 | `codex/02-dirty-inventory` | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Blocked on Slice 1 merge |
+| 3 | `codex/03-rental` | Guarded rent/return flow with ownership and visible history | Blocked on Slice 2 merge |
+| 4 | `codex/04-audit-release` | Deterministic/LLM audit, honest documentation, manual smoke verification, and Railway-ready configuration | Blocked on Slice 3 merge |
 
-The targets total five implementation hours. User review, CI queueing, dependency
-downloads, and Railway provisioning latency are outside that clock. When a target
-is threatened, reduce visual polish, HTMX enhancement, or abstraction—not the
-working login, dirty-data evidence, rental flow, deterministic fallback, or
-deployability.
+No implementation duration, estimate, or timebox is part of this roadmap. Agents
+work until the slice definition of done is satisfied and the PR is ready for
+review; elapsed time must not be used to skip validation or narrow the contract.
 
 ```mermaid
 flowchart LR
@@ -109,7 +107,6 @@ These omissions are documented assessment trade-offs, not accidental gaps.
 
 ## Release Boundary
 
-Slice 4 produces Railway-ready configuration within its 75-minute code
-budget. External publication and its unpredictable build/provisioning latency
-occur only after explicit user approval. Repository visibility changes and
-Railway secrets remain user-controlled actions.
+Slice 4 produces Railway-ready configuration. External publication occurs only
+after explicit user approval. Repository visibility changes and Railway secrets
+remain user-controlled actions.

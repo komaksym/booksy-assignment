@@ -2,8 +2,10 @@
 
 - **Status:** Design approved; awaiting written-spec review
 - **Branch:** `codex/01-shell-auth`
-- **Implementation budget:** 80 minutes
 - **Reference:** [Hardware Hub UI mockup](../../assets/hardware-hub-reference-ui.png)
+
+No implementation duration or timebox applies to this specification. Completion
+is determined only by the definition of done and review approval.
 
 ## Purpose
 
