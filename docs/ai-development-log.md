@@ -3,8 +3,8 @@
 ## Tooling
 
 ChatGPT was used to inspect the assignment, challenge scope, turn the agreed
-architecture into a review-gated plan, implement Slice 1 with test-first feedback,
-and review the finished diff. GitHub tools handled repository operations. The
+architecture into a review-gated plan, implement Slices 1 and 2 with test-first
+feedback, and review each bounded diff. GitHub tools handled repository operations. The
 implementation remains accountable to the checked-in specification and executable
 tests rather than generated prose.
 
@@ -12,12 +12,13 @@ tests rather than generated prose.
 
 The supplied hardware seed is intentionally malformed: it contains a duplicate
 source ID, invalid and missing values, future dates, unresolved assignments, and
-safety notes. Slice 1 deliberately does not import or clean it. The Slice 2 plan
-preserves every raw object under a generated internal identity and derives visible
-findings instead of silently rewriting source data.
+safety notes. Slice 2 preserves every raw object under a generated internal identity,
+derives visible findings, and stores corrections only in canonical fields.
 
 That avoids a common AI-generated migration failure: converting the list into a
-mapping keyed by source ID and losing one of the two records with ID `4`.
+mapping keyed by source ID and losing one of the two records with ID `4`. A persistent
+initialization marker also prevents explicit deletion from accidentally resurrecting
+the fixture on restart.
 
 ## Prompt trail
 
@@ -30,10 +31,17 @@ The main instructions that shaped this slice were:
 4. Establish only the reusable visual shell; do not build a fake dashboard before
    inventory exists.
 5. Run the same locked install, format, lint, and test commands locally and in CI.
+6. Preserve malformed values as evidence; never infer corrections such as changing
+   `Appel` or matching the legacy assignee email to an application user.
+7. Keep findings pure and transient, with exactly eight rule codes and 11 initial
+   row-level occurrences.
+8. Put authorization, validation, holder conflicts, and writes in Python; templates
+   receive precomputed presentation state only.
 
 The detailed decisions are preserved in:
 
 - `docs/superpowers/specs/2026-07-22-slice-1-shell-auth-design.md`
+- `docs/superpowers/specs/2026-07-22-slice-2-dirty-inventory-design.md`
 - `docs/superpowers/plans/2026-07-22-hardware-hub-roadmap.md`
 
 ## Corrections
@@ -54,4 +62,19 @@ formatting, Ruff linting, and pytest.
 A separate correction protected the upcoming seed import: indexing records by their
 supplied `id` would overwrite one of the two records with ID `4`. The approved design
 instead assigns generated internal IDs and preserves raw rows losslessly. That
-behavior remains in Slice 2 rather than being partially implemented here.
+behavior is now enforced by the Slice 2 integration test.
+
+The first Slice 2 draft treated an empty hardware table as an invitation to seed again.
+Independent review exposed that deleting every item would resurrect all 11 records on
+restart. The final implementation records first-run completion in the metadata table,
+backfills the marker when hardware already exists, and writes it only after one bulk
+insert succeeds.
+
+The same review found that installed wheels would omit the JSON fixture unless package
+data changed. `data/*.json` is now explicitly packaged and the built wheel was checked
+before handoff.
+
+Browser verification found no layout or redaction regression: the administrator saw
+both source-ID `4` edit links, source `7` rendered only the redacted legacy-assignee
+label, source `10` retained blank/null/Unknown evidence after correction, and the
+390-pixel layout kept horizontal overflow inside the table container.

@@ -29,7 +29,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -161,9 +163,10 @@ h2 {
   font-weight: 700;
 }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
-  min-height: 44px;
   border: 1px solid #bdcbc4;
   border-radius: 9px;
   background: white;
@@ -171,11 +174,283 @@ input {
   padding: 0.7rem 0.8rem;
 }
 
+input,
+select {
+  min-height: 44px;
+}
+
+textarea {
+  min-width: 0;
+  resize: vertical;
+}
+
 input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
 button:focus-visible,
 a:focus-visible {
   outline: 3px solid #72c997;
   outline-offset: 2px;
+}
+
+.authenticated {
+  overflow-x: hidden;
+}
+
+.app-layout {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 230px minmax(0, 1fr);
+}
+
+.site-sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100vh;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 1.4rem 1rem;
+  background: var(--forest-950);
+  color: white;
+}
+
+.site-nav {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.site-nav a {
+  border-radius: 9px;
+  padding: 0.7rem 0.8rem;
+  color: #d9ebe1;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-nav a:hover {
+  background: rgb(255 255 255 / 9%);
+  color: white;
+}
+
+.site-sidebar .session-controls {
+  display: grid;
+  margin-top: auto;
+  gap: 0.75rem;
+}
+
+.site-sidebar .identity {
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.site-sidebar .identity strong {
+  max-width: 100%;
+}
+
+.site-sidebar .button-quiet {
+  width: 100%;
+}
+
+.dashboard-heading,
+.form-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-alert {
+  margin-bottom: 1rem;
+}
+
+.filter-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
+  align-items: end;
+  gap: 0.8rem;
+  padding: 1rem;
+}
+
+.filter-form label {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.filter-form label span {
+  color: var(--forest-950);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.finding-summary {
+  margin: 1rem 0 0.65rem;
+  color: var(--forest-800);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.inventory-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.inventory-table {
+  width: 100%;
+}
+
+.hardware-name {
+  font-weight: 700;
+}
+
+.status-badge,
+.finding-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.69rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.status-badge {
+  background: var(--mint-200);
+  color: var(--forest-950);
+  padding: 0.35rem 0.55rem;
+}
+
+.status-repair,
+.status-correction {
+  background: #fff0cf;
+  color: #774a00;
+}
+
+.status-in-use {
+  background: #e7edff;
+  color: #294b8f;
+}
+
+.finding-list {
+  display: flex;
+  max-width: 20rem;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  white-space: normal;
+}
+
+.finding-badge {
+  border: 1px solid #efd7ae;
+  background: #fff8e8;
+  color: #704916;
+  padding: 0.25rem 0.4rem;
+}
+
+.finding-critical {
+  border-color: #eccaca;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.row-actions,
+.destructive-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.row-actions form,
+.destructive-actions form {
+  margin: 0;
+}
+
+.button.button-small {
+  min-height: 32px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.74rem;
+}
+
+.button.button-outline {
+  border-color: #9fb3a8;
+  background: white;
+  color: var(--forest-950);
+}
+
+.button.button-quiet-dark {
+  background: var(--mint-100);
+  color: var(--forest-950);
+}
+
+.button.button-danger {
+  background: var(--danger);
+  color: white;
+}
+
+.empty-state {
+  padding: 2.5rem 1rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.hardware-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.hardware-form-grid.create-only {
+  grid-template-columns: minmax(0, 680px);
+}
+
+.evidence-card,
+.hardware-form-card {
+  min-width: 0;
+  padding: 1.25rem;
+}
+
+.evidence-list {
+  display: grid;
+  margin: 0;
+  gap: 0.8rem;
+}
+
+.evidence-list div {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.8rem;
+}
+
+.evidence-list div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.evidence-list dt {
+  margin-bottom: 0.2rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.evidence-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.form-stack small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.destructive-actions {
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.25rem;
 }
 
 .button {
@@ -306,6 +581,47 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 720px) {
+  .app-layout {
+    display: block;
+  }
+
+  .site-sidebar {
+    position: static;
+    display: flex;
+    width: 100%;
+    height: auto;
+    flex-flow: row wrap;
+    align-items: center;
+    gap: 0.65rem 1rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+  }
+
+  .site-sidebar .session-controls {
+    display: flex;
+    min-width: 0;
+    margin: 0 0 0 auto;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .site-sidebar .identity {
+    width: auto;
+  }
+
+  .site-sidebar .button-quiet {
+    width: auto;
+  }
+
+  .hardware-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .site-header {
     align-items: flex-start;
   }
@@ -344,6 +660,27 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 430px) {
+  .dashboard-heading,
+  .form-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .site-sidebar .session-controls {
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+  }
+
+  .destructive-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .destructive-actions .button {
+    width: 100%;
+  }
+
   .site-header {
     flex-direction: column;
   }

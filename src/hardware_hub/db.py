@@ -17,3 +17,15 @@ def users_table(db: TinyDB) -> Table:
     """Return the users table used by the authentication slice."""
 
     return db.table("users")
+
+
+def hardware_table(db: TinyDB) -> Table:
+    """Return the hardware inventory table."""
+
+    return db.table("hardware")
+
+
+def metadata_table(db: TinyDB) -> Table:
+    """Return the application metadata table."""
+
+    return db.table("metadata")
