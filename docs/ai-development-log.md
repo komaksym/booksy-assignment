@@ -1,0 +1,50 @@
+# AI Development Log
+
+## Tooling
+
+ChatGPT was used to inspect the assignment, challenge scope, turn the agreed
+architecture into a review-gated plan, implement Slice 1 with test-first feedback,
+and review the finished diff. GitHub tools handled repository operations. The
+implementation remains accountable to the checked-in specification and executable
+tests rather than generated prose.
+
+## Data strategy
+
+The supplied hardware seed is intentionally malformed: it contains a duplicate
+source ID, invalid and missing values, future dates, unresolved assignments, and
+safety notes. Slice 1 deliberately does not import or clean it. The Slice 2 plan
+preserves every raw object under a generated internal identity and derives visible
+findings instead of silently rewriting source data.
+
+That avoids a common AI-generated migration failure: converting the list into a
+mapping keyed by source ID and losing one of the two records with ID `4`.
+
+## Prompt trail
+
+The main instructions that shaped this slice were:
+
+1. Deliver the smallest complete, testable change and stop for human review.
+2. Prefer a signed user-ID cookie and explicit MVP trade-offs over a session subsystem.
+3. Prove one vertical journey: bootstrap administrator login → create ordinary user
+   → ordinary-user login → server-side administrator denial.
+4. Establish only the reusable visual shell; do not build a fake dashboard before
+   inventory exists.
+5. Run the same locked install, format, lint, and test commands locally and in CI.
+
+The detailed decisions are preserved in:
+
+- `docs/superpowers/specs/2026-07-22-slice-1-shell-auth-design.md`
+- `docs/superpowers/plans/2026-07-22-hardware-hub-roadmap.md`
+
+## Correction
+
+An early generated settings model used Pydantic field-length validation for the
+session secret and bootstrap password. The resulting validation error included the
+rejected input value, which could expose a secret in startup logs. A failing
+regression test reproduced that leak. Validation was moved to explicit application
+and authentication helpers that raise concise errors without echoing credentials.
+
+A second correction protected the upcoming seed import: indexing records by their
+supplied `id` would overwrite one of the two records with ID `4`. The approved design
+instead assigns generated internal IDs and preserves raw rows losslessly. That
+behavior remains in Slice 2 rather than being partially implemented here.
