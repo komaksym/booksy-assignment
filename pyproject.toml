@@ -1,0 +1,43 @@
+[project]
+name = "hardware-hub"
+version = "0.1.0"
+description = "Booksy Hardware Hub recruitment assignment"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.128,<0.140",
+    "itsdangerous>=2.2,<3",
+    "jinja2>=3.1,<4",
+    "pwdlib[argon2]>=0.3,<1",
+    "pydantic-settings>=2.10,<3",
+    "python-multipart>=0.0.20,<1",
+    "tinydb>=4.8.2,<5",
+    "uvicorn>=0.35,<1",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28,<1",
+    "pytest>=9,<10",
+    "ruff>=0.15.22,<1",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+hardware_hub = ["templates/*.html", "static/*.css"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "SIM"]

@@ -1,0 +1,1 @@
+"""Hardware Hub application package."""
