@@ -82,9 +82,9 @@ runtime.
 - **Persistent initialization marker instead of migrations.** A marker prevents
   duplicate imports and prevents deleted rows from reappearing after restart. Production
   schema evolution would use an explicit migration system.
-- **Single-worker TinyDB mutations.** Each route re-reads current state before one
-  write, but there is no transaction or multi-worker guarantee. A production service
-  would use a transactional database.
+- **Single-worker TinyDB mutations.** Each accepted rent/return transition re-reads
+  current state before its one TinyDB update, but there is no transaction or
+  multi-worker guarantee. A production service would use a transactional database.
 - **Permanent hard deletion without a deletion log.** This directly satisfies the
   assignment but provides no recovery or audit trail.
 - **Derived findings instead of stored resolution state.** Findings always reflect

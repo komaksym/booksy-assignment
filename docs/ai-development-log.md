@@ -101,8 +101,8 @@ Rental history is rendered newest first while the stored history remains append-
 oldest first. Ordinary viewers see only `You` or `Another user`; administrators see
 resolved emails and `Unknown user` for a missing actor. Imported legacy assignee
 evidence remains unresolved and redacted. TinyDB is intentionally limited to a
-single-worker deployment: every route re-reads state before one update, without a
-transaction or multi-worker guarantee.
+single-worker deployment: each accepted rent/return transition re-reads current state
+before its one TinyDB update, without a transaction or multi-worker guarantee.
 
 The focused and full pytest runs retain the pre-existing FastAPI/Starlette TestClient
 deprecation warning. It is recorded as an existing dependency warning, not treated as
