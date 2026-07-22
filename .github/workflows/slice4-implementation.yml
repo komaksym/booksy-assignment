@@ -54,30 +54,25 @@ jobs:
           fi
       - name: Apply approved Slice 4 implementation
         run: python .github/scripts/implement_slice4.py implementation
-      - name: Regenerate and verify dependencies
+      - name: Regenerate dependencies
         run: |
           uv lock
           uv lock --check
           uv sync --locked
-      - name: Format
-        run: uv run ruff format .
-      - name: Lint and test
-        run: |
-          uv run ruff format --check .
-          uv run ruff check .
-          uv run pytest -q
-      - name: Build and inspect diff
-        run: |
-          uv build
-          git diff --check
-      - name: Commit verified implementation
+      - name: Attempt formatting and persist exact result
         shell: bash
         run: |
+          set +e
+          uv run ruff format . > /tmp/slice4-format.log 2>&1
+          format_status=$?
+          set -e
+          cat /tmp/slice4-format.log
           rm .github/workflows/slice4-implementation.yml
           rm .github/scripts/implement_slice4.py
           rm .github/slice4-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "feat(audit): complete MVP handoff" -m "Adds the administrator-only deterministic and optional DeepSeek audit, strict allowlisted snapshot and atomic response validation, focused non-mutation/privacy coverage, consolidated assessment documentation, and one-worker Railway configuration. Live Railway and real-provider verification remain explicitly pending user-controlled access and secrets."
+          git commit -m "wip(audit): persist generated implementation" -m "Persists the exact test-first Slice 4 output after the RED audit test and dependency regeneration. The formatting gate still reports a parse defect; this commit is intentionally unverified and exists only so the generated source can be inspected and repaired."
           git push origin HEAD:codex/04-audit-release
+          exit "$format_status"
