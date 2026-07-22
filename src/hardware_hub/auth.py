@@ -58,7 +58,14 @@ def create_user(users: Table, email: str, password: str, role: str = "user") -> 
 
 
 def bootstrap_admin(users: Table, email: str, password: str) -> None:
-    """Create the first administrator once without changing existing accounts."""
+    """Create the initial administrator without mutating existing accounts.
+
+    Startup becomes a no-op as soon as any administrator exists, which makes the
+    bootstrap idempotent. When no administrator exists, a collision with an existing
+    ordinary user's normalized email raises instead of silently promoting that account.
+    A genuinely new administrator is created through the same validation and hashing
+    path as every other user.
+    """
 
     if users.search(Query().role == "admin"):
         return
