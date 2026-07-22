@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
+# Canonical status values that the application treats as valid operational state.
 _SUPPORTED_STATUSES = {"Available", "In Use", "Repair"}
+# Exact case-insensitive phrases that make an Available item a safety risk.
 _SAFETY_PHRASES = ("battery swelling", "liquid damage")
 
 
@@ -66,10 +68,14 @@ def _finding(
     hardware_id: str,
     source_id: object | None,
 ) -> Finding:
+    """Construct one immutable finding value for a hardware item."""
+
     return Finding(code, severity, hardware_id, source_id)
 
 
 def _is_strict_date(value: object) -> bool:
+    """Return whether a value is a real date in exact ``YYYY-MM-DD`` form."""
+
     if not isinstance(value, str) or len(value) != 10:
         return False
     try:
@@ -79,10 +85,14 @@ def _is_strict_date(value: object) -> bool:
 
 
 def _is_after_today(value: object, today: date) -> bool:
+    """Return whether a valid canonical purchase date lies after ``today``."""
+
     return _is_strict_date(value) and date.fromisoformat(value) > today
 
 
 def _has_safety_evidence(record: dict[str, object], raw_payload: dict[object, object]) -> bool:
+    """Detect exact safety phrases in immutable or editable notes/history."""
+
     evidence = (
         raw_payload.get("notes", ""),
         raw_payload.get("history", ""),
