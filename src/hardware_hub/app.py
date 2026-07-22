@@ -49,19 +49,19 @@ def _dashboard_context(
     *,
     user: dict[str, Any],
     all_records: list[dict[str, Any]],
+    visible_records: list[dict[str, Any]],
     records: list[dict[str, Any]],
     filters: dict[str, str],
     error: str | None,
 ) -> dict[str, Any]:
     """Build template-ready dashboard state without mutating stored hardware.
 
-    ``all_records`` drives global brands and administrator finding totals, while
-    ``records`` is the already filtered and sorted subset rendered in the table.
-    Each table row is copied before presentation-only findings and repair actions
-    are attached.
+    ``all_records`` drives circulation decisions, ``visible_records`` supplies
+    role-safe filter choices, and ``records`` is the filtered/sorted table subset.
+    Each table row is copied before presentation-only state is attached.
     """
 
-    findings = find_issues(all_records, date.today()) if user["role"] == "admin" else ()
+    findings = find_issues(all_records, date.today())
     by_hardware: dict[str, list[Finding]] = {}
     for finding in findings:
         by_hardware.setdefault(finding.hardware_id, []).append(finding)
@@ -69,7 +69,10 @@ def _dashboard_context(
     rows = []
     for record in records:
         row = dict(record)
-        row["findings"] = by_hardware.get(str(record["id"]), [])
+        record_findings = by_hardware.get(str(record["id"]), [])
+        if user["role"] == "admin":
+            row["findings"] = record_findings
+        row.update(_circulation_action(record, user, record_findings))
         row["repair_action"] = (
             "mark-repair"
             if record.get("holder_user_id") is None and record.get("status") == "Available"
@@ -82,7 +85,7 @@ def _dashboard_context(
     brands = sorted(
         {
             str(record["brand"])
-            for record in all_records
+            for record in visible_records
             if isinstance(record.get("brand"), str) and record["brand"]
         },
         key=str.casefold,
@@ -204,27 +207,85 @@ def _visible_hardware(hardware: Any, user: dict[str, Any], internal_id: str) -> 
 
 
 def _circulation_action(
-    record: dict[str, Any], user: dict[str, Any], all_records: list[dict[str, Any]]
+    record: dict[str, Any], user: dict[str, Any], record_findings: list[Finding]
 ) -> dict[str, str | None]:
     """Return the safe, presentation-only circulation action or reason for one item."""
 
-    if user["role"] != "user":
-        return {"action": None, "reason": None}
+    if user["role"] == "admin":
+        return {"rental_action": None, "rental_reason": None}
     if record.get("status") == "Available" and record.get("holder_user_id") is None:
-        blocked = any(
-            finding.hardware_id == record["id"] and finding.severity == "critical"
-            for finding in find_issues(all_records, date.today())
-        )
-        if blocked:
-            return {"action": None, "reason": "Blocked by safety check"}
-        return {"action": "rent", "reason": None}
+        if any(finding.severity == "critical" for finding in record_findings):
+            return {"rental_action": None, "rental_reason": "Blocked by safety check"}
+        return {"rental_action": "rent", "rental_reason": None}
     if record.get("status") == "In Use" and record.get("holder_user_id") == user["id"]:
-        return {"action": "return", "reason": None}
+        return {"rental_action": "return", "rental_reason": None}
     if record.get("status") == "In Use" and record.get("holder_user_id") is not None:
-        return {"action": None, "reason": "Currently rented"}
+        return {"rental_action": None, "rental_reason": "Currently rented"}
     if record.get("status") == "Repair":
-        return {"action": None, "reason": "Under repair"}
-    return {"action": None, "reason": "Unavailable"}
+        return {"rental_action": None, "rental_reason": "Under repair"}
+    return {"rental_action": None, "rental_reason": "Unavailable"}
+
+
+def _rental_history_context(
+    record: dict[str, Any], user: dict[str, Any], users_by_id: dict[str, dict[str, Any]]
+) -> list[dict[str, str]]:
+    """Build newest-first, privacy-resolved rental activity for one detail page."""
+
+    history = record.get("rental_history", [])
+    if not isinstance(history, list):
+        return []
+    entries = []
+    for event in reversed(history):
+        if not isinstance(event, dict):
+            continue
+        actor = (
+            users_by_id.get(str(event.get("user_id")), {}).get("email", "Unknown user")
+            if user["role"] == "admin"
+            else "You"
+            if event.get("user_id") == user["id"]
+            else "Another user"
+        )
+        entries.append(
+            {
+                "label": "Rent" if event.get("type") == "rent" else "Return",
+                "actor": str(actor),
+                "occurred_at": str(event.get("occurred_at", "")),
+            }
+        )
+    return entries
+
+
+def _hardware_detail_context(
+    *,
+    user: dict[str, Any],
+    record: dict[str, Any],
+    all_records: list[dict[str, Any]],
+    users: list[dict[str, Any]],
+    error: str | None,
+) -> dict[str, Any]:
+    """Build privacy-aware display state for the canonical hardware detail page."""
+
+    findings = find_issues(all_records, date.today())
+    record_findings = [finding for finding in findings if finding.hardware_id == record["id"]]
+    display_record = {
+        key: record.get(key) for key in ("id", "name", "brand", "purchase_date", "status")
+    }
+    users_by_id = {
+        str(candidate["id"]): candidate
+        for candidate in users
+        if isinstance(candidate.get("id"), str)
+    }
+    circulation = _circulation_action(record, user, record_findings)
+    return {
+        "user": user,
+        "record": display_record,
+        "rental_action": circulation["rental_action"],
+        "rental_reason": circulation["rental_reason"],
+        "rental_history": _rental_history_context(record, user, users_by_id),
+        "findings": record_findings if user["role"] == "admin" else [],
+        "original_import": _original_import(record) if user["role"] == "admin" else [],
+        "error": error,
+    }
 
 
 def _detail_response(
@@ -238,11 +299,16 @@ def _detail_response(
     """Render a fresh canonical hardware detail response."""
 
     record = _visible_hardware(request.app.state.hardware, user, internal_id)
-    circulation = _circulation_action(record, user, request.app.state.hardware.all())
     return _TEMPLATES.TemplateResponse(
         request=request,
         name="hardware_detail.html",
-        context={"user": user, "record": record, "circulation": circulation, "error": error},
+        context=_hardware_detail_context(
+            user=user,
+            record=record,
+            all_records=request.app.state.hardware.all(),
+            users=request.app.state.users.all(),
+            error=error,
+        ),
         status_code=status_code,
     )
 
@@ -358,7 +424,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             name="dashboard.html",
             context=_dashboard_context(
                 user=user,
-                all_records=all_records if user["role"] == "admin" else visible,
+                all_records=all_records,
+                visible_records=visible,
                 records=records,
                 filters=filters,
                 error=error,

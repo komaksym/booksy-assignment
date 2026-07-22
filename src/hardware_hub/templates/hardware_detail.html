@@ -16,18 +16,64 @@
     <p class="alert" role="alert">{{ error }}</p>
   {% endif %}
 
-  <section class="card" aria-label="Hardware status">
-    <p>
-      <span class="status-badge status-{{ record.status | lower | replace(' ', '-') }}">
-        {{ record.status }}
-      </span>
-    </p>
-    {% if circulation.action %}
-      <form method="post" action="/hardware/{{ record.id }}/{{ circulation.action }}">
-        <button class="button button-primary" type="submit">{{ circulation.action | title }}</button>
-      </form>
-    {% elif circulation.reason %}
-      <p class="muted">{{ circulation.reason }}</p>
+  <div class="hardware-detail-grid">
+    <section class="card detail-card" aria-labelledby="hardware-summary-title">
+      <h2 id="hardware-summary-title">Application values</h2>
+      <dl class="detail-fields">
+        <div><dt>Brand</dt><dd>{{ record.brand if record.brand is not none else "—" }}</dd></div>
+        <div><dt>Purchase date</dt><dd>{{ record.purchase_date if record.purchase_date is not none else "—" }}</dd></div>
+        <div><dt>Status</dt><dd><span class="status-badge status-{{ record.status | lower | replace(' ', '-') if record.status else 'correction' }}">{{ record.status if record.status is not none else "Needs correction" }}</span></dd></div>
+      </dl>
+      {% if rental_action %}
+        <form method="post" action="/hardware/{{ record.id }}/{{ rental_action }}">
+          <button class="button button-primary" type="submit">{{ rental_action | title }}</button>
+        </form>
+      {% elif rental_reason %}
+        <p class="disabled-reason">{{ rental_reason }}</p>
+      {% endif %}
+    </section>
+
+    {% if user.role == "admin" %}
+      <section class="card detail-card" aria-labelledby="detail-findings-title">
+        <h2 id="detail-findings-title">Findings</h2>
+        <div class="finding-list">
+          {% for finding in findings %}
+            <span class="finding-badge finding-{{ finding.severity }}">{{ finding.code | replace("_", " ") | title }}</span>
+          {% else %}
+            <span class="muted">None</span>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="card detail-card evidence-card" aria-labelledby="original-import-title">
+        <h2 id="original-import-title">Original import</h2>
+        {% if original_import %}
+          <dl class="evidence-list">
+            {% for field in original_import %}
+              <div><dt>{{ field.label }}</dt><dd>{{ field.value }}</dd></div>
+            {% endfor %}
+          </dl>
+        {% else %}
+          <p class="muted">This hardware was created in the application.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+  </div>
+
+  <section class="card detail-card rental-history" data-testid="rental-history" aria-labelledby="rental-history-title">
+    <h2 id="rental-history-title">Rental history</h2>
+    {% if rental_history %}
+      <ol class="history-list">
+        {% for entry in rental_history %}
+          <li>
+            <strong>{{ entry.label }}</strong>
+            <span>{{ entry.actor }}</span>
+            <time datetime="{{ entry.occurred_at }}">{{ entry.occurred_at }}</time>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="muted">No Hardware Hub rental activity has been recorded.</p>
     {% endif %}
   </section>
 {% endblock %}
