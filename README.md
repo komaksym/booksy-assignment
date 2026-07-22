@@ -43,7 +43,7 @@ The package build includes the Jinja templates and CSS required at runtime.
 - FastAPI/Jinja application shell and public health endpoint.
 - Idempotent bootstrap administrator with Argon2 password hashing.
 - Administrator-only creation and listing of active ordinary users.
-- Login, an eight-hour inactivity timeout for the signed `user_id` session, and POST logout.
+- Login, an eight-hour absolute maximum for the signed `user_id` session, and POST logout.
 - Server-side role enforcement and responsive login/admin screens.
 - Vertical authentication/authorization coverage plus a secret-safe startup regression test.
 - Locked dependencies, package build configuration, and the minimal CI gate.
@@ -51,10 +51,10 @@ The package build includes the Jinja templates and CSS required at runtime.
 ### Deliberate MVP shortcuts
 
 - **Signed cookie instead of opaque server-side sessions.** It is tamper-evident and
-  simple for the assessment, but not centrally revocable or encrypted. Authenticated
-  responses refresh the cookie, so the eight-hour limit is an inactivity timeout,
-  not an absolute maximum session lifetime. Production would use centrally managed
-  sessions or company SSO.
+  simple for the assessment, but not centrally revocable or encrypted. Under the
+  generated lockfile, read-only authenticated activity does not refresh the cookie,
+  so the eight-hour value is an absolute maximum lifetime rather than an inactivity
+  timeout. Production would use centrally managed sessions or company SSO.
 - **`SameSite=Strict` plus POST-only mutations instead of synchronizer CSRF tokens.**
   This reduces risk but is not a complete CSRF defense. Production would add explicit
   CSRF protection.
