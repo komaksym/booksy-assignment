@@ -1,0 +1,38 @@
+name: Slice 4 verified repair
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: codex/04-audit-release
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - run: uv sync --locked
+      - name: Apply canonical formatting
+        run: uv run ruff format .
+      - name: Verify source and behavior
+        run: |
+          uv lock --check
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run pytest -q
+          uv build
+          git diff --check
+      - name: Commit verified repair
+        run: |
+          rm .github/workflows/slice4-repair.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(audit): verify generated implementation" -m "Applies canonical Ruff formatting and commits the Slice 4 implementation only after the lockfile check, Ruff format/lint, full pytest suite, package build, and diff validation pass."
+          git push origin HEAD:codex/04-audit-release
