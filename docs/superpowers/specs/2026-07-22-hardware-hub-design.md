@@ -1,292 +1,270 @@
-# Hardware Hub Design
+# Hardware Hub MVP Design
 
 ## Objective
 
-Build a small internal equipment-management application that demonstrates a
-reliable CRUD core, guarded rent/return transitions, admin-created access, and
-an AI-assisted inventory audit. The implementation is deliberately optimized
-for a four-to-five-hour assessment rather than production scale.
+Build a working internal hardware-management product within a nominal five-hour
+implementation budget. The submission should demonstrate a complete user
+journey, sound handling of unreliable source data, and an honest explanation of
+shortcuts. It should not attempt to resemble a production platform.
+
+## Product Thesis
+
+The supplied malformed seed is part of the product problem, not setup noise.
+Hardware Hub must preserve what it received, show administrators what is wrong,
+and prevent clearly unsafe actions without silently rewriting the source.
+
+That behavior is more valuable to the assessment than sophisticated session,
+concurrency, migration, or deployment infrastructure.
 
 ## Success Criteria
 
-- An administrator can create accounts and manage hardware.
-- Only administrator-created, active accounts can log in.
-- Users can view, sort, filter, rent, and return hardware.
-- Invalid transitions, including renting unavailable or unsafe hardware, fail
-  without partially changing state.
-- The supplied dirty dataset is preserved, imported safely, and visibly
-  audited rather than silently corrected.
-- The AI layer adds interpretation without becoming a source of truth or a
-  prerequisite for core application behavior.
-- The application deploys as one service with durable demo data.
+- A bootstrap administrator can log in and create user accounts.
+- Only active, administrator-created users can access the application.
+- Users can browse, sort, filter, rent, and return hardware.
+- Administrators can add, edit, delete, and toggle repair status.
+- All eleven supplied seed records survive import, including the duplicate
+  source ID and malformed values.
+- Administrators can see deterministic data-quality and safety findings.
+- Unsafe, invalid, repaired, or unavailable hardware cannot be rented.
+- An administrator can request an LLM-assisted audit, while deterministic
+  findings still work when the provider is absent or fails.
+- The application can run as one Railway service with persistent TinyDB data.
 
 ## Architecture
 
-The application uses FastAPI for routing and server-side application logic,
-Jinja for HTML rendering, HTMX for partial-page interactions, and plain CSS for
-the visual layer. It contains no client-side application state and requires no
-JavaScript or TypeScript application code.
-
-TinyDB is the persistence layer. The deployed Railway service runs exactly one
-replica and one Uvicorn worker with a persistent volume mounted at `/data`.
-`TINYDB_PATH` defaults to a repository-local file during development and is set
-to `/data/hardware-hub.json` in Railway.
+FastAPI serves Jinja pages enhanced with HTMX and plain CSS. TinyDB stores users
+and hardware in one JSON file. Application modules are split by feature only
+where it keeps route code readable; there is no repository framework, unit-of-
+work abstraction, migration engine, or client-side application state.
 
 ```mermaid
 flowchart LR
-    Browser["Browser: HTML + HTMX"] --> Web["FastAPI routes"]
-    Web --> Auth["Authentication service"]
-    Web --> Inventory["Inventory service"]
-    Web --> Audit["Audit service"]
-    Auth --> Store["TinyDB repository"]
-    Inventory --> Store
-    Store -->|"inventory snapshot"| Audit
-    Audit --> Rules["Deterministic rules"]
-    Audit --> LLM["LLM adapter"]
-    LLM -->|"validated findings"| Audit
+    Browser["Jinja + HTMX browser"] --> App["FastAPI application"]
+    App --> Users["Users + signed session"]
+    App --> Hardware["Inventory + rental rules"]
+    App --> Audit["Deterministic + LLM audit"]
+    Users --> DB["TinyDB JSON"]
+    Hardware --> DB
+    Audit --> DB
+    Audit --> LLM["OpenAI-compatible API"]
 ```
 
-Route handlers remain thin. Authentication, inventory transitions, validation,
-and auditing live in separate services. TinyDB access is isolated behind
-repositories so a future relational database does not require changing HTTP or
-domain behavior.
-
-## TinyDB Safety Boundary
-
-TinyDB does not provide multi-process transactions or ACID guarantees. The MVP
-therefore makes its operating boundary explicit:
-
-- one Railway replica;
-- one Uvicorn worker;
-- one process-wide asynchronous mutation lock;
-- every TinyDB mutation, including bootstrap, user, session, rent, return,
-  repair, create, update, archive, and seed writes, holds that lock; stateful
-  domain operations also re-read and validate current state while holding it;
-- all changes to a hardware record and its embedded history are written as one
-  repository operation.
-
-This protects the assessment's expected traffic and concurrent requests inside
-the one process. Multi-replica deployment is unsupported by design and is
-documented as a production limitation.
+The deployment contract is deliberately narrow: one Railway replica and one
+Uvicorn worker. Multi-process writes are unsupported and documented.
 
 ## Data Model
 
-Pydantic models define the schema at the application boundary even though
-TinyDB itself is schema-less.
-
 ### User
 
-- generated internal ID;
-- normalized, unique email;
+- generated UUID;
+- normalized unique email;
 - Argon2id password hash;
-- role: `admin` or `user`;
-- active flag;
-- creator ID and creation timestamp.
-
-### Session
-
-- SHA-256 hash of a cryptographically random token;
-- user ID;
-- random session-bound synchronizer CSRF token;
-- creation and expiration timestamps.
+- `admin` or `user` role;
+- active flag and creation timestamp.
 
 ### Hardware
 
-- generated internal ID independent of the seed ID;
-- preserved source ID and original seed payload;
-- canonical name, brand, purchase date, and status when valid;
+- generated internal UUID independent of the supplied ID;
+- nullable source ID and a value-equivalent deep copy of the complete raw source
+  object (both null for administrator-created records);
+- editable canonical name, brand, purchase date, and status;
 - notes and legacy history text;
-- current holder user ID when rented through the application;
-- embedded immutable history events;
-- archive timestamp;
+- current holder user ID for rentals created by this application;
+- embedded rent/return history events;
 - creation and update timestamps.
 
-Canonical status is `Available`, `In Use`, `Repair`, or null when an imported
-status is invalid. Null-status records remain visible to administrators but are
-never rentable.
+Canonical status is `Available`, `In Use`, `Repair`, or null. Invalid imported
+dates and statuses remain present in the raw object while their canonical value
+is null.
 
-### History Event
+## Authentication
 
-- action: create, update, rent, return, mark repair, clear repair, or archive;
-- actor user ID;
-- timestamp;
-- small action-specific details payload.
+There is no public registration.
 
-## Seed Import
+The first administrator is created idempotently from
+`BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` when no admin exists.
+Administrators create subsequent users with an initial password.
 
-Import runs only when the hardware collection is empty. Each source record gets
-a fresh internal ID, so duplicate source IDs do not collide. The complete input
-record is retained for traceability.
+Passwords use Argon2id. Starlette's signed-cookie session stores only the user
+ID and expires after eight hours. Every request reloads that user and rejects an
+inactive or missing account. The cookie is `HttpOnly`, `SameSite=Strict`, and
+`Secure` in production. Logout clears it.
 
-Valid dates and statuses are parsed into canonical fields. Invalid values are
-retained in the raw payload and represented as null canonical values. Brand
-spellings, safety notes, and ambiguous history are never silently rewritten.
-The auditor reports them for an administrator to correct.
+The signed cookie is tamper-evident but not encrypted or centrally revocable.
+The MVP does not implement synchronizer CSRF tokens; all mutations use POST and
+the strict same-site cookie. These are explicit assessment shortcuts.
 
-Imported `In Use` records without a resolvable account remain visible and
-blocked from new rental. They are reported as inconsistent legacy assignments.
+## Seed Import and Dirty-Data Behavior
 
-## Authentication and Authorization
+Import runs only when the hardware table is empty. The loader parses the complete
+JSON array before inserting anything. Every source object receives a new internal
+UUID, so the two records with source ID `4` do not collide. The complete original
+object is retained as a JSON value-equivalent deep copy; source whitespace and key
+ordering are not meaningful.
 
-There is no public registration route.
+Only ISO `YYYY-MM-DD` dates and the three supported statuses populate canonical
+fields. Administrators edit canonical fields; the raw source remains an audit
+reference and is never rewritten.
 
-The first administrator is created idempotently from Railway environment
-secrets when no admin exists. An authenticated administrator creates subsequent
-accounts and supplies an initial password. The initial-password approach is an
-explicit MVP shortcut; production would use an expiring invitation.
+The deterministic audit emits exactly eight objective rule codes and eleven
+row-level occurrences for the supplied fixture:
 
-Login performs the following steps:
+| Rule | Severity | Affected source records |
+| --- | --- | --- |
+| `DUPLICATE_SOURCE_ID` | warning | both records with ID `4` |
+| `FUTURE_PURCHASE_DATE` | warning | `6` |
+| `INVALID_PURCHASE_DATE` | warning | `9` |
+| `MISSING_BRAND` | warning | `10` |
+| `MISSING_PURCHASE_DATE` | warning | `10` |
+| `INVALID_STATUS` | critical | `10` |
+| `UNRESOLVED_HOLDER` | critical | `2`, `7` |
+| `SAFETY_RISK` | critical | `5`, `11`, only while canonically available |
 
-1. Normalize the submitted email.
-2. Look up an active user and verify the Argon2id password hash.
-3. Return the same generic failure for unknown email, inactive account, and bad
-   password.
-4. Generate a random 256-bit opaque session token.
-5. Store only the token's SHA-256 hash with its expiry.
-6. Send the raw token in a `__Host-session` cookie configured with `Secure`,
-   `HttpOnly`, `SameSite=Strict`, and `Path=/`.
+The misspelled `Appel` brand remains unchanged. It is suitable for an LLM
+suggestion but not a deterministic correction.
 
-Each protected request hashes the cookie token, resolves an unexpired session,
-and loads the active user. Admin routes additionally require the `admin` role.
-Sessions expire after eight hours and a new token is issued for every successful
-login. Logout deletes the stored session and clears the cookie. State-changing
-HTML forms also require a session-bound CSRF token.
+Finding state is derived, never persisted:
+
+| Finding | Active while | Clears when |
+| --- | --- | --- |
+| duplicate source ID | immutable source ID occurs more than once | one duplicate is explicitly deleted |
+| future purchase date | canonical date is after today | canonical date is today or earlier |
+| invalid purchase date | raw date exists, is not strict ISO, and canonical date is null | canonical date is valid |
+| missing purchase date | raw date is absent/null and canonical date is null | canonical date is valid |
+| missing brand | canonical brand is null/blank | canonical brand is non-blank |
+| invalid status | raw status is unsupported and canonical status is null | canonical status is valid |
+| unresolved holder | canonical status is `In Use` and application holder is null | an admin explicitly changes status away from `In Use` |
+| safety risk | canonical status is `Available` and a safety phrase occurs in immutable raw or current notes/history | canonical status becomes unavailable; seeded evidence cannot be cleared by editing text |
+
+Administrators see findings beside affected hardware and on the audit page.
+Normal users do not see canonical-null records. Source `10` is the main correction
+demonstration: assigning canonical brand, date, and status clears exactly its three
+repairable findings while its raw blank, null, and `Unknown` values remain. Invalid
+submissions change nothing. Duplicate provenance warnings cannot be edited away.
+Safety inspection always includes immutable imported notes/history, so deleting
+editable text cannot erase the evidence; marking the record `Repair` removes the
+unsafe-available condition.
 
 ## Inventory and Rental Rules
 
-The backend is authoritative; hiding a button is never treated as enforcement.
+The dashboard supports server-side filtering and sorting by name, brand,
+purchase date, and status.
 
-- Only unarchived hardware with canonical status `Available` and no blocking
-  deterministic safety issue can be rented.
-- Renting changes the status to `In Use`, records the current holder, and
-  appends a rent event while holding the mutation lock.
-- A second rent request observes the changed state and fails with a conflict.
-- A user can return only hardware currently assigned to that user.
-- An administrator may force-return hardware; the action is attributed in
-  history.
-- Returning clears the holder, changes status to `Available`, and appends a
-  return event.
-- `Repair` hardware cannot be rented.
-- Hardware already `In Use` must be returned before it can enter `Repair`.
-- Only non-rented hardware can be archived.
+Administrators can create, edit, hard-delete, mark repair, and clear repair.
+Hard deletion has no recovery or deletion audit trail; this directly satisfies
+the assignment and is documented as an MVP limitation.
 
-Domain failures return stable categories: unauthenticated, forbidden, not
-found, validation error, and state conflict. HTMX responses render a concise
-inline error without replacing valid page state.
+Rental state owns `In Use`: administrator forms do not create that status. While
+`holder_user_id` is set, metadata may be corrected but status changes, repair
+actions, and deletion are rejected. Mark repair is an `Available → Repair`
+transition; clear repair is `Repair → Available`; both require no holder. This
+prevents an administrator shortcut from producing `Available + holder`.
 
-## Hybrid Inventory Auditor
+A rental succeeds only when the current canonical status is `Available`, there
+is no current holder, and deterministic findings contain no critical safety
+risk. Renting changes status to `In Use`, stores the user ID, and appends one
+history event. A user can return only their own rental; returning clears the
+holder, restores `Available`, and appends one event.
 
-The audit is an administrator-triggered, read-only operation.
+Each mutation re-reads current state immediately before a single TinyDB update.
+There is no process-wide locking or multi-worker guarantee. The single-worker
+deployment and lack of `await` between validation and update make this adequate
+for assessment traffic; a relational transaction is the production answer.
 
-Deterministic rules always check:
+## AI-Assisted Audit
 
-- duplicate source IDs;
-- missing or blank required fields;
-- invalid or future purchase dates;
-- invalid statuses;
-- `In Use` hardware without a resolvable holder;
-- contradictory assignments;
-- obvious safety phrases such as battery swelling or liquid damage on
-  supposedly available hardware.
+The audit is admin-triggered and read-only. Deterministic findings always run
+first.
 
-Finding severity is `critical`, `warning`, or `info`. Critical deterministic
-findings participate in the rental guard. LLM-only findings never block or
-mutate hardware regardless of severity.
+When `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` are configured, the app makes
+one OpenAI-compatible request containing an allowlisted hardware snapshot and
+the deterministic findings. It does not send user, password, cookie, or secret
+records. Notes and legacy history are included because interpreting them is the
+feature; residual free-text privacy risk is documented.
 
-After rule evaluation, the configured LLM adapter makes exactly one request per
-administrator-triggered audit. It receives the small inventory snapshot and
-deterministic findings. It may identify ambiguous risks in notes or history and
-returns structured findings containing hardware ID, severity, evidence,
-explanation, and recommended action. A Pydantic schema rejects unknown IDs,
-invalid severities, and malformed output.
-
-The snapshot contains hardware data only. User records, session data,
-credentials, and secrets are never included; assignment consistency is conveyed
-as an anonymous present-or-missing signal rather than an employee identity.
-Before notes or legacy history leave the process, email addresses and common
-credential/token patterns are redacted. The outbound DTO never serializes the
-raw source payload.
-
-The adapter targets an OpenAI-compatible HTTP API configured through
-`LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`. The deployed demo configures all
-three values and applies a ten-second request timeout. If credentials are absent,
-the request times out, or output is invalid, the UI still shows complete
-deterministic findings plus a non-blocking provider warning. The LLM never gets
-write access, and there is no one-click AI mutation.
+The response uses one small Pydantic schema with hardware ID, severity,
+explanation, and recommendation. Malformed output, missing configuration,
+provider errors, or the ten-second HTTP timeout produce a visible warning while
+preserving deterministic results. LLM findings never mutate hardware or block a
+rental.
 
 ## User Interface
 
-The application is desktop-first and remains usable at narrow widths.
+The visual foundation is defined in the first slice: a compact desktop-first
+layout, neutral palette, status badges, accessible forms, table styles, and a
+usable narrow-width layout. There is no separate mockup or design-system phase.
 
-- **Login:** email and password form with generic authentication errors.
-- **Hardware dashboard:** sortable and filterable table containing name, brand,
-  purchase date, status, assignee, and contextual rent/return controls.
-- **Admin hardware:** add, edit, mark/clear repair, and archive controls.
-- **Admin accounts:** create and list accounts.
-- **Admin audit:** grouped deterministic and AI findings with severity,
-  evidence, and a link to edit the affected hardware.
+The primary product design lands with the inventory slice:
 
-Sorting and filtering operate server-side through query parameters. HTMX
-replaces only the table or form fragment. Full-page requests produce the same
-content, keeping the application functional without HTMX enhancement.
+- login and navigation shell;
+- sortable/filterable hardware dashboard;
+- visible status, assignee, and data-issue indicators;
+- admin account and hardware forms;
+- contextual rent/return controls;
+- grouped deterministic and AI audit findings.
+
+For administrators, the inventory and edit screens also prove the import rather
+than merely claiming it: all eleven rows are visible; both source-ID `4` records
+have distinct edit links; source `9` shows its original date beside an unset
+canonical date; source `10` shows its three malformed values; and sources `5` and
+`11` show their safety evidence. Legacy assignment presence is shown without
+rendering source `7`'s email address. Escaping happens only during HTML rendering,
+never by rewriting stored values.
+
+If time remains, HTMX may replace the dashboard table fragment. Full-page form
+submissions and redirects are authoritative; no acceptance criterion depends on
+JavaScript.
 
 ## Deployment
 
-Railway builds and runs the FastAPI service from the Git repository. Production
-configuration includes:
+Railway runs one Uvicorn worker and mounts a volume at `/data`.
 
-- one replica and one Uvicorn worker;
-- a persistent volume mounted at `/data`;
-- `ENVIRONMENT=production` so the persistent-path guard is active;
 - `TINYDB_PATH=/data/hardware-hub.json`;
-- `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` stored only as Railway
-  secrets;
-- `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` stored only as Railway secrets;
-- a health endpoint that does not expose configuration or inventory data.
+- `SESSION_SECRET`, bootstrap credentials, and LLM settings are Railway secrets;
+- `/health` returns only `{"status":"ok"}`;
+- seed import and bootstrap run at application startup;
+- a manual deployment checklist verifies data survives one redeploy.
 
-Startup fails closed if Railway runtime markers are present while
-`ENVIRONMENT` is not `production`, or if the resolved TinyDB path escapes the
-mounted volume.
+There is no runtime volume-path guard, backup automation, continuous health
+monitoring, or deployment pipeline. Configuration mistakes are operational
+risks documented in the README.
 
-The free allowance is acceptable for assessment traffic but is not treated as
-a production availability guarantee.
+## Test Budget
 
-## Testing
+The automated suite focuses on five high-value behaviors:
 
-Tests use a temporary TinyDB path and never call a live LLM.
+1. A bootstrap admin creates an ordinary user; both log in, while the ordinary
+   user is denied one admin mutation.
+2. The seed imports all eleven records idempotently without duplicate-ID loss and
+   produces the exact eleven deterministic finding occurrences.
+3. An ordinary user is denied the correction; an admin corrects source `10`
+   without modifying its raw seed object.
+4. One unsafe item is blocked while a safe item completes the owner-only
+   rent/return journey with history.
+5. One LLM provider failure preserves deterministic findings and inventory.
 
-Critical coverage includes:
+Ruff and pytest run in one GitHub Actions job. Browser behavior is checked with
+a short manual smoke checklist rather than Playwright.
 
-1. An unknown account cannot log in and receives no session cookie.
-2. An admin-created account can log in.
-3. A normal user cannot create accounts or manage hardware.
-4. Repair, invalid, or deterministically unsafe hardware cannot be rented.
-5. Two concurrent rent attempts yield exactly one success.
-6. Only the current renter or an administrator can return hardware.
-7. Rent and return operations append attributable history.
-8. The supplied seed produces the expected deterministic findings.
-9. Malformed or unavailable LLM output falls back to deterministic findings.
+## Explicit Trade-offs
 
-At least one end-to-end browser test covers admin account creation followed by
-the new user's login and rent/return journey.
+- signed cookie instead of persisted opaque sessions;
+- SameSite and POST-only forms instead of synchronizer CSRF tokens;
+- one worker and revalidation instead of transactional concurrency control;
+- idempotent seed loading instead of a migration framework;
+- one response schema and fallback instead of a hardened LLM gateway;
+- documented Railway setup instead of runtime storage guards;
+- five focused tests and manual browser smoke instead of broad automated E2E.
 
-## Deliberate Non-Goals
+The README will state these decisions, why they are acceptable for the
+assessment, and the production follow-up for each.
 
-- public registration;
-- self-service password changes, password recovery, and email invitations;
+## Non-Goals
+
+- public registration, invitations, password reset, or password change;
+- session revocation UI;
+- pagination or notifications;
+- automatic data repair or AI writes;
+- finding acknowledgement/resolution workflow;
 - multiple workers or replicas;
-- pagination;
-- notifications;
-- semantic search or chat;
-- automatic AI corrections;
-- a persistent finding-resolution workflow.
-
-## Documented Trade-offs and Follow-up
-
-The README will explicitly identify TinyDB's single-process limitation,
-admin-assigned initial passwords, and free-hosting availability as MVP
-shortcuts. The first production improvements would be:
-
-1. Replace TinyDB and the process lock with a transactional relational database.
-2. Add expiring account invitations and password recovery.
-3. Persist audit findings with acknowledgement and resolution history.
+- automated browser, load, or deployment testing.

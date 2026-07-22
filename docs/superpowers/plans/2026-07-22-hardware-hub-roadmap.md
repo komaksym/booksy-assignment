@@ -1,1023 +1,721 @@
-# Hardware Hub Implementation Plan
+# Hardware Hub MVP Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Deliver the approved Hardware Hub MVP as five sequential pull requests, each providing a testable end-to-end outcome and stopping for user review before the next begins.
+**Goal:** Ship one reviewable vertical hardware-management product in four pull
+requests and a nominal five hours of implementation time.
 
-**Architecture:** FastAPI route handlers render Jinja pages and HTMX fragments while auth, inventory, rental, and audit services own behavior. Repositories isolate TinyDB, and one application-scoped async lock serializes every TinyDB mutation. Deterministic rules protect inventory transitions; a read-only OpenAI-compatible adapter enriches admin audits without becoming a dependency of core behavior.
+**Architecture:** FastAPI renders Jinja pages, TinyDB persists one JSON file, and
+small feature modules contain authentication, inventory rules, rental mutations,
+and audit behavior. A signed cookie stores only the active user's internal ID.
+Deterministic validation is the safety authority; the LLM is an optional read-only
+second opinion.
 
-**Tech Stack:** Python 3.12, FastAPI, Jinja2, HTMX, TinyDB, Pydantic Settings, pwdlib/Argon2id, HTTPX, pytest, Playwright, Ruff, mypy, uv, GitHub Actions, Railway.
+**Tech Stack:** Python 3.12, FastAPI, Uvicorn, Jinja2, TinyDB, Pydantic Settings,
+pwdlib with Argon2, Starlette SessionMiddleware, HTTPX, HTMX as optional progressive
+enhancement, plain CSS, pytest, Ruff, uv, GitHub Actions, Railway.
 
-## Global Constraints
+## Plan Summary
 
-- Execute exactly one slice at a time from freshly reviewed and merged `main`.
-- Use `codex/` branch names from the table in `PLANS.md`; do not stack PRs.
-- Use TDD for domain behavior: write the failing test, run it and observe the
-  expected failure, implement the smallest behavior, then rerun it.
-- Keep route handlers thin. Presentation code must not own authorization,
-  validation, transitions, persistence, or LLM decisions.
-- Route every TinyDB write through one application-scoped `asyncio.Lock`.
-  TinyDB rewrites the shared JSON document, so this includes users, sessions,
-  bootstrap, seed import, hardware, and history.
-- Never hold the mutation lock across an LLM network call. Snapshot under the
-  lock, release it, then call the provider.
-- Store no secrets in Git, logs, rendered errors, LLM requests, or tests.
-- Use temporary TinyDB paths in all tests. No test may call a live provider.
-- Escape all seed and user-supplied text through Jinja autoescaping.
-- Update `docs/AI_DEVELOPMENT_LOG.md` and `docs/PROMPT_TRAIL.md` in the slice
-  where a decision or correction occurs; do not reconstruct the history later.
-- Each slice must pass:
+The malformed fixture is the centerpiece. Preserve every supplied JSON object,
+give each record a separate internal identity, show the discrepancies to an
+administrator, and block objectively unsafe rentals. Do not spend the assignment
+building session storage, CSRF infrastructure, migrations, locking, an LLM gateway,
+or a browser-test harness.
 
-  ```bash
-  uv sync --locked --all-extras
-  uv run ruff format --check .
-  uv run ruff check .
-  uv run mypy src
-  uv run pytest -q
-  uv build
-  ```
+| Slice | Branch | Code budget | Browser-visible outcome |
+| --- | --- | ---: | --- |
+| 1 | `codex/01-shell-auth` | 80m | App shell, login, admin-created users, visual foundation, minimal CI |
+| 2 | `codex/02-dirty-inventory` | 90m | Exact dirty import, findings, dashboard, admin CRUD/correction |
+| 3 | `codex/03-rental` | 55m | Safe rent/return, ownership, history |
+| 4 | `codex/04-audit-release` | 75m | Deterministic/LLM audit, honest README, Railway-ready config |
 
-- Each PR body must use `Summary`, `Validation`, `Risks / Notes`, and
-  `Breaking changes`, and must include the slice-specific Mermaid DAG below.
-- After the PR opens, stop for user review. Start no file from the next slice.
+The 300 minutes cover implementation, local validation, and PR preparation. User
+review, CI queues, dependency downloads, and Railway provisioning are external
+latency. Stop at each review gate; do not start the next branch before the current
+PR is approved and merged.
 
-## Standard Sub-Agent Orchestration
+```mermaid
+flowchart LR
+    A["PR 1: shell + auth"] --> B["PR 2: dirty inventory"]
+    B --> C["PR 3: rental"]
+    C --> D["PR 4: audit + handoff"]
+```
 
-For every slice, the root agent performs this sequence:
+## Rules Shared by Every Slice
 
-- [ ] Create the branch from updated `main` and record the exact acceptance
-  contract in the active task.
-- [ ] Spawn at least two implementation sub-agents with `fork_turns="none"`,
-  self-contained prompts, and disjoint file ownership. Use domain/repository,
-  web/templates, and tests/docs as the preferred seams.
-- [ ] Integrate each completed subtask before assigning work that depends on it.
-- [ ] Spawn two fresh read-only reviewers in parallel: one for specification and
-  test coverage, one for code quality and security.
-- [ ] Resolve every high-confidence finding and rerun the full validation gate.
-- [ ] Have only the root agent stage and commit. Use a concise conventional
-  subject plus a body explaining the reason, key detail, and known limitation.
-- [ ] Push the branch, open one PR, include the required DAG, and stop.
+### Lightweight agent workflow
 
-Parallel edits to a shared file are forbidden. Parallel read-only review is
-encouraged because it provides speed without worktree conflicts.
+- [ ] Root agent creates the slice branch from reviewed `main` and owns all Git
+      operations.
+- [ ] Dispatch one bounded implementation sub-agent. A second implementer is
+      allowed only when its files are disjoint and it saves real time.
+- [ ] Root agent integrates and runs the relevant check immediately after each
+      meaningful change.
+- [ ] Dispatch one fresh read-only sub-agent to compare the finished diff with
+      this plan and identify only release-blocking gaps.
+- [ ] Root agent fixes valid gaps, runs the complete minimal gate, performs the
+      manual smoke checklist, and opens one PR.
+- [ ] Sub-agents never commit, push, open PRs, or edit the same file concurrently.
 
----
+### Minimal automated gate
 
-## Slice 1: Walking Skeleton, Persistence Boundary, and Minimal CI
+Every PR must pass exactly this gate locally and in one GitHub Actions Ubuntu job:
 
-**Branch:** `codex/01-foundation-ci`
+```bash
+uv sync --locked
+uv run ruff format --check .
+uv run ruff check .
+uv run pytest -q
+```
 
-**Outcome:** A reviewer can clone the repository, install it, run a FastAPI
-service, receive a safe health response, verify an injectable TinyDB path, and
-see the same checks run in one GitHub Actions job.
+Do not add mypy, coverage thresholds, package builds, Playwright, a CI matrix,
+preview environments, or deployment automation.
 
-**Agent allocation:** One agent owns Task 1.1. After that contract lands, a
-storage agent owns Task 1.2 while a CI/documentation agent owns Task 1.3 on
-non-overlapping files; the root integrates their `app.py`/config touchpoints
-sequentially if either needs them.
+### Five behavior tests
 
-### Task 1.1: Package and application factory
+Keep the suite centered on these five integration-level test functions:
 
-**Files:**
+1. `test_admin_creates_user_and_signed_session_enforces_roles`
+2. `test_seed_import_is_lossless_idempotent_and_reports_exact_findings`
+3. `test_admin_inventory_writes_preserve_raw_evidence`
+4. `test_rent_and_return_enforce_safety_ownership_and_history`
+5. `test_audit_falls_back_without_mutating_inventory`
 
-- Create: `pyproject.toml`
-- Create: `uv.lock`
-- Create: `.python-version`
-- Create: `.gitignore`
-- Create: `src/hardware_hub/__init__.py`
-- Create: `src/hardware_hub/app.py`
-- Create: `src/hardware_hub/config.py`
-- Create: `src/hardware_hub/templates/base.html`
-- Create: `src/hardware_hub/templates/home.html`
-- Create: `src/hardware_hub/static/app.css`
-- Create: `tests/conftest.py`
-- Create: `tests/test_health.py`
+A behavior test may make several requests and assertions. Add a sixth test only
+for a discovered regression that cannot be proven inside these scenarios; the
+target is confidence, not an artificial test count.
 
-- [ ] Configure Python `>=3.12,<3.13` and the `src` package layout. Add
-  `fastapi`, `uvicorn[standard]`, `jinja2`, `tinydb`, `pydantic-settings`, and
-  direct `httpx` support for Starlette's test client as runtime dependencies;
-  add `pytest`, `pytest-asyncio`, `ruff`, and `mypy` as development dependencies.
-  Generate and commit `uv.lock`. Enable Ruff security rules; allow assertion
-  rule `S101` only in tests.
-- [ ] Write and run the failing health test:
+### Product invariants
 
-  ```python
-  def test_health_exposes_only_liveness(client: TestClient) -> None:
-      response = client.get("/health")
+- Never key, update, or deduplicate hardware by the supplied source ID.
+- Preserve all 11 raw objects as JSON value-equivalent deep copies. Lossless does
+  not mean preserving whitespace or object-key order.
+- Never catch and skip malformed seed rows. Parse the full list, then bulk insert.
+- Only administrators mutate users or inventory. All state changes use POST.
+- Reload the active user on every request and re-read hardware immediately before
+  mutation.
+- Deploy one Uvicorn worker. There is no multi-worker or contention guarantee.
+- Deterministic rules alone can block rental; LLM output cannot mutate or block.
+- Escape values while rendering HTML, never by changing persisted data.
 
-      assert response.status_code == 200
-      assert response.json() == {"status": "ok"}
-      assert "TINYDB_PATH" not in response.text
-  ```
+### Known security and operational shortcuts
 
-  Run: `uv run pytest tests/test_health.py -q`
-  Expected: fail because `hardware_hub.app` does not exist.
-
-- [ ] Implement `Settings` and the application factory with explicit dependency
-  injection:
-
-  ```python
-  class Settings(BaseSettings):
-      environment: Literal["development", "test", "production"] = "development"
-      tinydb_path: Path = Path("var/hardware-hub.json")
-
-  def create_app(settings: Settings | None = None) -> FastAPI:
-      resolved = settings or Settings()
-      app = FastAPI(title="Hardware Hub")
-      app.state.settings = resolved
-      return app
-
-  app = create_app()
-  ```
-
-- [ ] Mount static files, configure Jinja templates with autoescape, render the
-  minimal home page, and keep `/health` independent of data/config details.
-- [ ] Run the health test and the formatting/lint/type checks.
-- [ ] Commit with subject `feat(core): add FastAPI walking skeleton` and a body
-  describing the injectable settings boundary.
-
-### Task 1.2: Shared TinyDB runtime and production-volume guard
-
-**Files:**
-
-- Create: `src/hardware_hub/storage.py`
-- Create: `src/hardware_hub/lifespan.py`
-- Create: `tests/test_storage.py`
-- Create: `tests/test_config.py`
-- Modify: `src/hardware_hub/app.py`
-- Modify: `src/hardware_hub/config.py`
-
-- [ ] Write failing tests proving that each app instance owns one database and
-  one mutation lock, test data goes to `tmp_path`, the database closes on
-  shutdown, repository writes outside the current task's mutation context fail,
-  overlapping writes to two dummy tables never enter concurrently, and
-  production rejects a database path outside the Railway volume:
-
-  ```python
-  def test_production_requires_volume_path(tmp_path: Path) -> None:
-      settings = Settings(
-          environment="production",
-          tinydb_path=tmp_path / "ephemeral.json",
-          railway_volume_mount_path=Path("/data"),
-      )
-
-      with pytest.raises(ValueError, match="persistent Railway volume"):
-          validate_storage_path(settings)
-  ```
-
-- [ ] Implement these narrow runtime interfaces:
-
-  ```python
-  class Storage:
-      @asynccontextmanager
-      async def mutation(self) -> AsyncIterator[None]: ...
-
-      def require_mutation_owner(self) -> None:
-          """Raise unless the current asyncio task owns the mutation lock."""
-
-  def open_storage(settings: Settings) -> Storage: ...
-  def validate_storage_path(settings: Settings) -> None: ...
-  ```
-
-- [ ] Keep the TinyDB handle private to `Storage`; expose read access to
-  repositories and require every repository insert/update/remove method to call
-  `require_mutation_owner()`. Track ownership with the current asyncio task so a
-  lock held by a different request cannot satisfy the assertion.
-
-- [ ] Validate the production path only when `environment == "production"`.
-  Require both `RAILWAY_VOLUME_MOUNT_PATH` and a `TINYDB_PATH` contained beneath
-  it. Compare fully resolved absolute paths, and test `..` traversal, a sibling
-  prefix such as `/data-backup`, and a symlink inside the mount that escapes it.
-  Never print either resolved path in an HTTP response.
-- [ ] Fail closed when Railway runtime markers such as `RAILWAY_ENVIRONMENT` or
-  `RAILWAY_PROJECT_ID` exist but `ENVIRONMENT` is not `production`; test this so
-  an omitted variable cannot silently disable the persistent-path guard.
-- [ ] Open storage and create required directories during FastAPI lifespan, not
-  at module import or in a Railway pre-deploy command.
-- [ ] Run: `uv run pytest tests/test_storage.py tests/test_config.py -q`
-- [ ] Commit with subject `feat(storage): isolate TinyDB runtime` and a body
-  explaining the single-process/all-writes locking boundary.
-
-### Task 1.3: CI, Railway configuration, and contributor setup
-
-**Files:**
-
-- Create: `.github/workflows/ci.yml`
-- Create: `.env.example`
-- Create: `docs/railway.env.example`
-- Create: `railway.toml`
-- Create: `README.md`
-- Create: `docs/AI_DEVELOPMENT_LOG.md`
-- Create: `docs/PROMPT_TRAIL.md`
-- Create: `tests/test_deployment_contract.py`
-
-- [ ] Write a deployment-contract test that loads `railway.toml` and asserts
-  `/health`, `$PORT`, and `--workers 1` are present in the deploy configuration;
-  also assert `.env.example` uses local `ENVIRONMENT=development` while
-  `docs/railway.env.example` names `ENVIRONMENT=production`,
-  `TINYDB_PATH=/data/hardware-hub.json`, the expected platform-provided
-  `RAILWAY_VOLUME_MOUNT_PATH=/data`, and secret variable names without values.
-- [ ] Add one Ubuntu CI job for pull requests and pushes to `main`, using one
-  Python version and exactly the global validation commands. Give the workflow
-  only `contents: read`; pin `actions/checkout` and `astral-sh/setup-uv` to these
-  reviewed immutable commits, disable persisted checkout credentials, install
-  uv `0.11.16`, and let setup-uv provision Python 3.12:
-
-  ```yaml
-  permissions:
-    contents: read
-
-  steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      with:
-        persist-credentials: false
-    - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
-      with:
-        version: "0.11.16"
-        python-version: "3.12"
-        enable-cache: true
-  ```
-
-  Do not add a build matrix, coverage service, preview deploy, or release job.
-- [ ] Configure Railway with Railpack and this runtime contract:
-
-  ```toml
-  [build]
-  builder = "RAILPACK"
-
-  [deploy]
-  startCommand = "uv run uvicorn hardware_hub.app:app --host 0.0.0.0 --port $PORT --workers 1"
-  healthcheckPath = "/health"
-  healthcheckTimeout = 100
-  ```
-
-- [ ] Put local non-secret defaults in `.env.example` and the production contract
-  with empty secret values in `docs/railway.env.example`. Document that Railway
-  must set `ENVIRONMENT=production`, attach a volume at `/data`, expose its
-  platform mount variable, and set `TINYDB_PATH=/data/hardware-hub.json`;
-  `railway.toml` cannot attach a volume or provision secrets.
-- [ ] Add local setup/run/test instructions and initialize the implementation
-  status, shortcut, next-step, AI-tooling, data-strategy, prompt-trail, and
-  correction sections required by the assignment.
-- [ ] Run the full validation gate from a clean environment.
-- [ ] Commit with subject `ci: add minimal validation gate` and a body describing
-  what CI deliberately omits.
-
-### Slice 1 acceptance and PR
-
-- [ ] Confirm `/health` returns exactly `{"status":"ok"}`.
-- [ ] Confirm no test writes outside `tmp_path`.
-- [ ] Confirm production startup fails for a missing/mismatched volume path.
-- [ ] Run the service locally and smoke-check home and health pages.
-- [ ] Open the PR with this DAG:
-
-  ```mermaid
-  flowchart LR
-      Env["Environment"] --> Settings["Validated settings"]
-      Settings --> App["FastAPI lifespan"]
-      App --> Store["TinyDB + shared lock"]
-      App --> Health["Safe /health"]
-      CI["GitHub Actions"] --> Checks["lint + types + tests + build"]
-  ```
-
-- [ ] Stop for user review and merge.
+The signed session cookie is tamper-evident, not encrypted or centrally revocable.
+`SameSite=Strict` and POST-only forms reduce cross-site request risk but are not a
+complete CSRF defense. TinyDB writes are not transactional across workers. Railway
+storage correctness depends on the documented `/data` volume configuration. These
+trade-offs belong in the README; they do not need infrastructure in code.
 
 ---
 
-## Slice 2: Admin-Provisioned Authentication
+## Slice 1 — App Shell, Authentication, UI Foundation, and CI
 
-**Branch:** `codex/02-admin-auth`
+- **Branch:** `codex/01-shell-auth`
+- **Timebox:** 80 minutes
+- **Outcome:** A bootstrap administrator can log in, create an ordinary user, and
+  prove that the user can log in while admin routes remain protected.
 
-**Outcome:** A bootstrap administrator can log in, create an account, and that
-new user can log in; unknown or inactive accounts cannot gain access and no
-public registration path exists.
+### Files
 
-**Agent allocation:** A domain/security agent owns Task 2.1, then separate web
-and account-flow agents own Tasks 2.2 and 2.3 in order because both touch auth
-routes. Fresh spec and security reviewers run in parallel afterward.
+Create:
 
-### Task 2.1: Auth domain, repositories, and cryptography
+```text
+.env.example
+.github/workflows/ci.yml
+.gitignore
+.python-version
+pyproject.toml
+uv.lock
+src/hardware_hub/__init__.py
+src/hardware_hub/app.py
+src/hardware_hub/auth.py
+src/hardware_hub/config.py
+src/hardware_hub/db.py
+src/hardware_hub/static/app.css
+src/hardware_hub/templates/base.html
+src/hardware_hub/templates/login.html
+src/hardware_hub/templates/admin_users.html
+tests/conftest.py
+tests/test_auth.py
+```
 
-**Files:**
+### Data and route contract
 
-- Create: `src/hardware_hub/auth/__init__.py`
-- Create: `src/hardware_hub/auth/models.py`
-- Create: `src/hardware_hub/auth/repository.py`
-- Create: `src/hardware_hub/auth/security.py`
-- Create: `src/hardware_hub/auth/service.py`
-- Create: `tests/auth/test_service.py`
-- Create: `tests/auth/test_bootstrap.py`
-- Modify: `pyproject.toml`
-- Modify: `uv.lock`
-- Modify: `src/hardware_hub/config.py`
-- Modify: `src/hardware_hub/lifespan.py`
+User documents contain `id`, normalized `email`, `password_hash`, `role`, `active`,
+and `created_at`. Use generated UUID strings for internal IDs. The session payload
+contains only `user_id`.
 
-- [ ] Add `pwdlib[argon2]` as a runtime dependency and refresh `uv.lock`.
-- [ ] Write failing service tests for normalized unique email, Argon2id hashing,
-  idempotent bootstrap, missing/partial first-admin configuration, generic
-  authentication failure, session expiry, logout, inactive-user invalidation,
-  and raw-token non-persistence. Add concurrent `User@Example.com` versus
-  `user@example.com` creation and assert exactly one succeeds, plus lock probes
-  proving user insert, session insert, and session removal all execute inside
-  the current task's `Storage.mutation()` context.
-- [ ] Fix the clock and token generator in tests through injected callables. Use
-  this public contract:
+Routes:
 
-  ```python
-  @dataclass(frozen=True, slots=True)
-  class IssuedSession:
-      raw_token: str
-      csrf_token: str
-      expires_at: datetime
+```text
+GET  /health                 public, returns {"status": "ok"}
+GET  /login                  public login page
+POST /login                  verifies active user and sets signed session
+POST /logout                 clears session
+GET  /admin/users            admin only
+POST /admin/users            admin only; creates active user
+```
 
-  class AuthService:
-      async def bootstrap_admin(self) -> None: ...
-      async def create_user(self, actor: User, command: CreateUser) -> User: ...
-      async def authenticate(self, email: str, password: str) -> IssuedSession: ...
-      async def resolve_session(self, raw_token: str) -> AuthContext | None: ...
-      async def logout(self, raw_token: str) -> None: ...
-  ```
+### Task 1.1 — Scaffold the runnable service (0–15m)
 
-- [ ] Persist only `sha256(raw_token)` for the session. Store a separate random
-  synchronizer CSRF token on the server and compare submitted tokens with
-  `secrets.compare_digest`.
-- [ ] Generate every raw session token from 32 cryptographically random bytes
-  and issue a new token for every successful login.
-- [ ] Use a fixed dummy Argon2id hash when the email is unknown so unknown and
-  bad-password requests follow the same password-verification path.
-- [ ] Put bootstrap email/password in optional settings. Reject a half-configured
-  pair. When an admin already exists, do nothing even if credentials are absent;
-  when no admin exists, require both values and create exactly one admin. Execute
-  bootstrap under the shared mutation lock during lifespan.
-- [ ] In `create_user`, `authenticate`, and `logout`, acquire
-  `Storage.mutation()`, re-read uniqueness/user/session state, then perform the
-  write. Add one cross-table overlap test proving a user write and session write
-  serialize even though they use different repositories.
-- [ ] Run: `uv run pytest tests/auth/test_service.py tests/auth/test_bootstrap.py -q`
-- [ ] Commit with subject `feat(auth): add account and session services` and a
-  body explaining opaque-token storage and bootstrap idempotence.
+- [ ] Create `pyproject.toml` with only the runtime and development dependencies
+      listed in the tech stack; configure Ruff for Python 3.12 and pytest's source
+      path.
+- [ ] Generate and commit `uv.lock`; never hand-edit it.
+- [ ] In `config.py`, define settings for TinyDB path, session secret, environment,
+      bootstrap email/password, and optional LLM fields. Fail clearly when the
+      session secret or bootstrap credentials are missing.
+- [ ] In `db.py`, expose one TinyDB opener plus named `users` and `hardware` table
+      helpers. Do not create repositories or a unit of work.
+- [ ] In `app.py`, create the FastAPI app, mount static files, configure templates,
+      register `/health`, and close TinyDB on shutdown.
+- [ ] Run `uv run ruff check .` and start the app with
+      `uv run uvicorn --app-dir src hardware_hub.app:app --reload` long enough to
+      verify `/health`.
 
-### Task 2.2: Login/logout HTTP flow and protection dependencies
+### Task 1.2 — Write the authentication behavior first (15–25m)
 
-**Files:**
+- [ ] Add the shared temporary-database/settings/TestClient fixture in
+      `tests/conftest.py`.
+- [ ] Write `test_admin_creates_user_and_signed_session_enforces_roles` as one
+      journey: bootstrap admin logs in, creates an ordinary user, that user logs in,
+      and the ordinary user receives 403 on one admin POST.
+- [ ] Run only this test and confirm it fails for the missing behavior:
 
-- Create: `src/hardware_hub/auth/dependencies.py`
-- Create: `src/hardware_hub/auth/routes.py`
-- Create: `src/hardware_hub/web/__init__.py`
-- Create: `src/hardware_hub/web/csrf.py`
-- Create: `src/hardware_hub/templates/login.html`
-- Create: `src/hardware_hub/templates/partials/auth_error.html`
-- Create: `tests/auth/test_routes.py`
-- Modify: `pyproject.toml`
-- Modify: `uv.lock`
-- Modify: `src/hardware_hub/app.py`
-- Modify: `src/hardware_hub/templates/base.html`
+```bash
+uv run pytest tests/test_auth.py -q
+```
 
-- [ ] Add `python-multipart` as a runtime dependency for FastAPI form parsing
-  and refresh `uv.lock`.
-- [ ] Write failing route tests proving unknown email, inactive account, and bad
-  password return the same visible error and emit no `Set-Cookie`; `/register`
-  returns 404; expired/logged-out sessions cannot reach protected pages; and
-  logout rejects a missing, wrong, or cross-session CSRF token. Also prove a
-  cross-origin or token-less login POST cannot install a session.
-- [ ] Add `current_user`, `require_user`, and `require_admin` dependencies backed
-  by `resolve_session`.
-- [ ] Expose `GET /login`, `POST /login`, CSRF-protected `POST /logout`, and a
-  protected `GET /` hub landing page. Redirect successful login to `/`; Slice 3
-  adds `/hardware` without making this slice depend on that future route.
-- [ ] On `GET /login`, generate a pre-session double-submit token, render it as a
-  hidden field, and set it in a short-lived `__Host-login-csrf` cookie with
-  Secure, HttpOnly, SameSite=Strict, and Path=/ attributes. On `POST /login`,
-  require constant-time equality between cookie and form values before password
-  verification, then clear/rotate the token. This is separate from the persisted
-  authenticated-session CSRF token.
-- [ ] On successful login set exactly:
+### Task 1.3 — Implement the smallest authentication flow (25–55m)
 
-  ```python
-  response.set_cookie(
-      key="__Host-session",
-      value=issued.raw_token,
-      secure=True,
-      httponly=True,
-      samesite="strict",
-      path="/",
-      max_age=8 * 60 * 60,
-  )
-  ```
+- [ ] Hash bootstrap and new-user passwords with Argon2 through pwdlib.
+- [ ] Bootstrap the first administrator only when no administrator exists; normalize
+      email with `strip().lower()` and reject duplicates.
+- [ ] Configure SessionMiddleware with an eight-hour lifetime, `HttpOnly`,
+      `SameSite=Strict`, and `https_only=True` only in production.
+- [ ] Implement helpers that load the user ID from the signed session, query the
+      current active user, and enforce administrator role. Never cache a user in
+      the cookie.
+- [ ] Implement login, logout, admin user list, and admin user creation with
+      redirect-after-POST and one generic visible login error.
+- [ ] Run the auth test until it passes. Confirm the application stores only
+      `user_id` in the session mapping.
 
-- [ ] On logout delete the stored session and clear the cookie with matching
-  attributes. Do not expose raw tokens in logs or response bodies.
-- [ ] Test using an HTTPS `TestClient` base URL so Secure-cookie behavior is
-  exercised rather than bypassed.
-- [ ] Run: `uv run pytest tests/auth/test_routes.py -q`
-- [ ] Commit with subject `feat(auth): protect sessions and routes` and a body
-  describing cookie and generic-error behavior.
+### Task 1.4 — Establish the visual language (55–68m)
 
-### Task 2.3: Admin-created account UI and CSRF enforcement
+- [ ] Build one compact base layout with navigation, flash/error region, content
+      width, and logged-in identity.
+- [ ] Define plain-CSS tokens and shared styles for buttons, forms, tables, status
+      pills, issue pills, focus states, and a narrow-width stacked layout.
+- [ ] Style the login and user pages. Do not create a component library, animation
+      system, dark mode, or mockup phase.
+- [ ] Manually check the pages at desktop width and approximately 390px width.
 
-**Files:**
+### Task 1.5 — Add minimal CI and open PR 1 (68–80m)
 
-- Create: `src/hardware_hub/templates/admin/users.html`
-- Create: `src/hardware_hub/templates/admin/user_form.html`
-- Create: `src/hardware_hub/web/responses.py`
-- Create: `tests/auth/test_admin_accounts.py`
-- Modify: `src/hardware_hub/auth/routes.py`
-- Modify: `src/hardware_hub/static/app.css`
-- Modify: `README.md`
-- Modify: `docs/AI_DEVELOPMENT_LOG.md`
-- Modify: `docs/PROMPT_TRAIL.md`
+- [ ] Add one GitHub Actions job containing only the four minimal-gate commands.
+- [ ] Run the full gate and fix every failure.
+- [ ] Have the read-only reviewer check authentication boundaries, cookie contents,
+      CI minimalism, and narrow-layout usability.
+- [ ] Commit with a concise subject and a factual body, for example:
 
-- [ ] Write failing tests for admin account creation, created-user login,
-  normalized duplicate rejection, non-admin 403, missing/wrong/cross-session
-  CSRF rejection, and no database change after every rejected request.
-- [ ] Render the session's CSRF token in every authenticated mutation form and
-  verify it before service invocation.
-- [ ] Implement admin-only `GET /admin/users` and `POST /admin/users` for the
-  user list/create page. Return stable 422 form errors for validation and 403
-  for authorization; do not leak whether an email exists through login
-  behavior.
-- [ ] Update implementation status and record the actual auth prompts,
-  trade-offs, and corrections made during this slice.
-- [ ] Run all auth tests and the full validation gate.
-- [ ] Commit with subject `feat(accounts): add admin provisioning flow` and a
-  body explaining that initial passwords are the deliberate MVP shortcut.
+```text
+feat(auth): add access shell
 
-### Slice 2 acceptance and PR
+Adds bootstrap-admin login, admin-created users, signed sessions, the shared UI
+foundation, health endpoint, and the minimal Ruff/pytest CI gate.
+```
 
-- [ ] Inspect TinyDB and confirm passwords are Argon2id hashes and session values
-  equal the SHA-256 of issued tokens rather than the raw tokens.
-- [ ] Manually complete bootstrap admin login, account creation, user login, and
-  logout; verify the cookie flags in the browser.
-- [ ] Open the PR with this DAG:
+- [ ] Push and open one PR. Include this local-scope DAG in the PR description:
 
-  ```mermaid
-  flowchart LR
-      Admin["Bootstrap admin"] --> Login["Generic login"]
-      Login --> Session["Hashed opaque session"]
-      Session --> Guard["User/admin + CSRF guards"]
-      Guard --> Create["Admin creates account"]
-      Create --> User["Created user can log in"]
-  ```
+```mermaid
+flowchart LR
+    Browser --> FastAPI
+    FastAPI --> SignedCookie["Signed user-id cookie"]
+    FastAPI --> Users["TinyDB users"]
+    GitHub --> Checks["Ruff + pytest"]
+```
 
-- [ ] Stop for user review and merge.
+**Manual smoke:** unknown login rejected; signed-cookie tampering logs the browser
+out; logout works; narrow layout does not require horizontal page scrolling.
+
+**Review gate:** Stop and wait for user approval and merge.
 
 ---
 
-## Slice 3: Inventory, Lossless Seed Import, and Deterministic Rules
+## Slice 2 — Lossless Dirty Seed, Findings, Dashboard, and Admin CRUD
 
-**Branch:** `codex/03-inventory-rules`
+- **Branch:** `codex/02-dirty-inventory`
+- **Timebox:** 90 minutes
+- **Outcome:** The browser visibly proves that all malformed source records
+  survived, and an administrator can correct canonical data without erasing the
+  evidence.
 
-**Outcome:** Users can browse, sort, and filter all valid visible hardware;
-administrators can manage it; the exact dirty dataset is preserved and its
-deterministic anomalies are visible and reusable as rental guards.
+### Files
 
-**Agent allocation:** Fresh agents own seed/model, deterministic rules,
-inventory service, and UI tasks in dependency order. Once implementation is
-integrated, data-integrity and web/security reviewers run concurrently.
+Create:
 
-### Task 3.1: Hardware schema and lossless seed import
+```text
+src/hardware_hub/data/hardware_seed.json
+src/hardware_hub/inventory.py
+src/hardware_hub/rules.py
+src/hardware_hub/templates/_hardware_table.html
+src/hardware_hub/templates/dashboard.html
+src/hardware_hub/templates/hardware_form.html
+tests/test_seed.py
+tests/test_inventory.py
+```
 
-**Files:**
+Modify `app.py`, `base.html`, and `app.css` only to register and display this slice.
 
-- Create: `src/hardware_hub/inventory/__init__.py`
-- Create: `src/hardware_hub/inventory/models.py`
-- Create: `src/hardware_hub/inventory/repository.py`
-- Create: `src/hardware_hub/inventory/seed.py`
-- Create: `src/hardware_hub/data/hardware_seed.json`
-- Create: `tests/inventory/test_seed.py`
-- Modify: `src/hardware_hub/lifespan.py`
+### Exact seed fixture
 
-- [ ] Transcribe the assignment's exact 11 JSON objects into
-  `hardware_seed.json`, including both source-ID `4` records, missing source ID
-  `8`, `Appel`, `22-05-2023`, the blank brand, null date, `Unknown`, battery
-  swelling, and liquid-damage text.
+`hardware_seed.json` must contain these 11 objects without correction:
 
-  ```json
-  [
-    {"id": 1, "name": "Apple iPhone 13 Pro Max", "brand": "Apple", "purchaseDate": "2021-11-23", "status": "Available"},
-    {"id": 2, "name": "Apple MacBook Pro 13", "brand": "Apple", "purchaseDate": "2021-12-20", "status": "In Use"},
-    {"id": 3, "name": "Razer Basilisk V2", "brand": "Razer", "purchaseDate": "2021-06-05", "status": "Repair"},
-    {"id": 4, "name": "SAMSUNG Galaxy S21", "brand": "Samsung", "purchaseDate": "2021-11-23", "status": "Available"},
-    {"id": 5, "name": "Dell XPS 15 9510", "brand": "Dell", "purchaseDate": "2022-03-15", "status": "Available", "notes": "Battery swelling, do not issue without service."},
-    {"id": 6, "name": "Logitech MX Master 3", "brand": "Logitech", "purchaseDate": "2027-10-10", "status": "Available"},
-    {"id": 7, "name": "Sony WH-1000XM4", "brand": "Sony", "purchaseDate": "2022-01-12", "status": "In Use", "assignedTo": "j.doe@booksy.com"},
-    {"id": 4, "name": "Duplicate ID Test Laptop", "brand": "Lenovo", "purchaseDate": "2023-01-01", "status": "Repair"},
-    {"id": 9, "name": "iPad Pro 12.9", "brand": "Appel", "purchaseDate": "22-05-2023", "status": "Available"},
-    {"id": 10, "name": "Unknown Device", "brand": "", "purchaseDate": null, "status": "Unknown"},
-    {"id": 11, "name": "MacBook Air M2", "brand": "Apple", "purchaseDate": "2023-08-01", "status": "Available", "history": "Returned by user with liquid damage. Keyboard sticky."}
-  ]
-  ```
-- [ ] Write failing tests proving first startup imports 11 records, second startup
-  imports zero, both source-ID `4` records have distinct internal UUIDs, and each
-  stored `raw_payload` is value-equivalent to its source object.
-- [ ] Model canonical status as `Available | In Use | Repair | None`. Parse only
-  ISO `YYYY-MM-DD` dates; preserve invalid values in `raw_payload` and use `None`
-  canonically. Never silently correct brands, dates, status, notes, or history.
-- [ ] Seed only when the hardware table is empty and run import inside the shared
-  mutation lock during app lifespan.
-- [ ] Run: `uv run pytest tests/inventory/test_seed.py -q`
-- [ ] Commit with subject `feat(inventory): import dirty seed losslessly` and a
-  body explaining source IDs versus internal IDs.
+```json
+[
+  {"id": 1, "name": "Apple iPhone 13 Pro Max", "brand": "Apple", "purchaseDate": "2021-11-23", "status": "Available"},
+  {"id": 2, "name": "Apple MacBook Pro 13", "brand": "Apple", "purchaseDate": "2021-12-20", "status": "In Use"},
+  {"id": 3, "name": "Razer Basilisk V2", "brand": "Razer", "purchaseDate": "2021-06-05", "status": "Repair"},
+  {"id": 4, "name": "SAMSUNG Galaxy S21", "brand": "Samsung", "purchaseDate": "2021-11-23", "status": "Available"},
+  {"id": 5, "name": "Dell XPS 15 9510", "brand": "Dell", "purchaseDate": "2022-03-15", "status": "Available", "notes": "Battery swelling, do not issue without service."},
+  {"id": 6, "name": "Logitech MX Master 3", "brand": "Logitech", "purchaseDate": "2027-10-10", "status": "Available"},
+  {"id": 7, "name": "Sony WH-1000XM4", "brand": "Sony", "purchaseDate": "2022-01-12", "status": "In Use", "assignedTo": "j.doe@booksy.com"},
+  {"id": 4, "name": "Duplicate ID Test Laptop", "brand": "Lenovo", "purchaseDate": "2023-01-01", "status": "Repair"},
+  {"id": 9, "name": "iPad Pro 12.9", "brand": "Appel", "purchaseDate": "22-05-2023", "status": "Available"},
+  {"id": 10, "name": "Unknown Device", "brand": "", "purchaseDate": null, "status": "Unknown"},
+  {"id": 11, "name": "MacBook Air M2", "brand": "Apple", "purchaseDate": "2023-08-01", "status": "Available", "history": "Returned by user with liquid damage. Keyboard sticky."}
+]
+```
 
-### Task 3.2: Deterministic findings and rentability contract
+### Stored hardware shape
 
-**Files:**
+```text
+id                     generated internal UUID; the only update/delete key
+source_id              original id or null for administrator-created rows
+raw_payload            deep-copied original object or null for new rows
+name                   canonical required string
+brand                  canonical string or null
+purchase_date          canonical ISO date string or null
+status                 Available | In Use | Repair | null
+notes                  editable text initialized from source notes
+legacy_history         editable text initialized from source history
+holder_user_id         null until an application rental
+rental_history         embedded list of application rent/return events
+created_at, updated_at timestamps
+```
 
-- Create: `src/hardware_hub/inventory/holder_resolution.py`
-- Create: `src/hardware_hub/inventory/rules.py`
-- Create: `tests/inventory/test_rules.py`
+Only exact `YYYY-MM-DD` strings populate the canonical date. Do not use permissive
+date parsing. Unsupported or missing statuses remain canonical null. All queries
+and form routes use internal `id`, never `source_id`.
 
-- [ ] Write table-driven failing tests for these exact seed findings and stable
-  rule contracts:
+### Exact deterministic contract
 
-  | Code | Severity | Affected source records |
-  | --- | --- | --- |
-  | `DUPLICATE_SOURCE_ID` | warning | both records with source ID `4` |
-  | `FUTURE_PURCHASE_DATE` | warning | source `6`, with clock fixed to `2026-07-22` |
-  | `UNRESOLVED_HOLDER` | critical | sources `2` and `7` |
-  | `SAFETY_RISK` | critical | sources `5` and `11` |
-  | `INVALID_PURCHASE_DATE` | warning | source `9` |
-  | `MISSING_BRAND` | warning | source `10` |
-  | `MISSING_PURCHASE_DATE` | warning | source `10` |
-  | `INVALID_STATUS` | critical | source `10` |
+`find_issues(records, today)` is a pure function returning transient findings. Do
+not persist findings, acknowledgements, correction logs, or resolution state. Fix
+`today=date(2026, 7, 22)` in tests.
 
-- [ ] Expose pure deterministic interfaces shared by admin display and Slice 4:
+| Code | Severity | Expected source occurrences |
+| --- | --- | --- |
+| `DUPLICATE_SOURCE_ID` | warning | both `4` rows |
+| `FUTURE_PURCHASE_DATE` | warning | `6` |
+| `INVALID_PURCHASE_DATE` | warning | `9` |
+| `MISSING_BRAND` | warning | `10` |
+| `MISSING_PURCHASE_DATE` | warning | `10` |
+| `INVALID_STATUS` | critical | `10` |
+| `UNRESOLVED_HOLDER` | critical | `2`, `7` |
+| `SAFETY_RISK` | critical | `5`, `11` while canonically Available |
 
-  ```python
-  @dataclass(frozen=True, slots=True)
-  class RuleContext:
-      today: date
-      holder_resolvable: Mapping[UUID, bool]
+That is eight codes and eleven row-level occurrences. Do not flag `Appel`, the
+missing source ID `8`, or any inferred typo. Safety checks inspect immutable raw
+notes/history as well as current text, so an edit cannot erase imported evidence.
 
-  def audit_inventory(
-      items: Sequence[Hardware],
-      *,
-      context: RuleContext,
-  ) -> list[Finding]: ...
+Use this trigger/clear contract; do not invent stored resolution state:
 
-  def evaluate_rentability(
-      item: Hardware,
-      findings: Sequence[Finding],
-  ) -> Rentability:
-      """Return allowed=False plus stable reason codes for blocking findings."""
-  ```
+| Finding | Trigger and clear rule |
+| --- | --- |
+| duplicate | count immutable non-null `source_id`; only explicit deletion changes it |
+| future date | canonical date is after `today`; a corrected non-future date clears it |
+| invalid date | non-null raw date is not strict ISO and canonical date is null; a valid canonical date clears it |
+| missing date | raw date is absent/null and canonical date is null; a valid canonical date clears it |
+| missing brand | canonical brand is null/blank; a non-blank canonical brand clears it |
+| invalid status | raw status is unsupported and canonical status is null; a supported canonical status clears it |
+| unresolved holder | canonical status is `In Use` and holder is null; an explicit admin status correction clears it |
+| safety | canonical status is `Available` and immutable raw or current notes/history has battery-swelling or liquid-damage evidence; making it unavailable clears it, while seeded evidence cannot be edited away |
 
-- [ ] Make archived, non-Available, null-status, unresolved legacy In Use,
-  battery-swelling, and liquid-damage records non-rentable. Only deterministic
-  critical findings can block; no LLM type appears in this module.
-- [ ] Also cover warning-level `MISSING_NAME` and critical
-  `CONTRADICTORY_ASSIGNMENT` findings on synthetic records so every
-  deterministic rule from the approved design has a stable code even when the
-  supplied seed does not exercise it.
-- [ ] Build `holder_resolvable` by matching a legacy `assignedTo` email to an
-  active normalized account or by resolving an application holder ID. Test that
-  creating active `j.doe@booksy.com` removes source `7`'s unresolved-holder
-  finding without exposing that email in the finding; source `2` remains
-  unresolved.
-- [ ] Confirm `Appel` remains unchanged. It may later be an LLM suggestion, but
-  it is not a deterministic mutation.
-- [ ] Run: `uv run pytest tests/inventory/test_rules.py -q`
-- [ ] Commit with subject `feat(inventory): add deterministic safety rules` and a
-  body explaining why rentability is independent of the LLM.
+### Task 2.1 — Write the dirty-data contract first (0–15m)
 
-### Task 3.3: Inventory service and admin mutations
+- [ ] In `tests/test_seed.py`, write
+      `test_seed_import_is_lossless_idempotent_and_reports_exact_findings`.
+- [ ] Assert 11 stored rows, raw payload list equality with the fixture, the original
+      source-ID sequence, two distinct internal IDs for source `4`, and no additions
+      after a second importer call.
+- [ ] Assert the complete 11-item `(code, source_id, internal_id)` finding set. Assert
+      explicitly that neither `Appel` nor the ID gap produces a finding.
+- [ ] Run this one test and confirm it fails before implementation.
 
-**Files:**
+### Task 2.2 — Implement atomic-enough import and pure findings (15–35m)
 
-- Create: `src/hardware_hub/inventory/service.py`
-- Create: `tests/inventory/test_service.py`
+- [ ] Load and validate that the fixture root is a list of 11 dictionaries before
+      opening the write path. Never key the list by source ID.
+- [ ] Build all canonical documents in memory using `deepcopy(raw)`, generated UUIDs,
+      and strict date/status conversion; then call TinyDB bulk insert once when the
+      hardware table is empty.
+- [ ] Implement a small immutable `Finding` dataclass or equivalent plain value in
+      `rules.py`; do not introduce a validation framework.
+- [ ] Implement the eight rules exactly. An unresolved holder means canonical status
+      is `In Use` while `holder_user_id` is null; never match `assignedTo` to a user.
+- [ ] Run the seed test until it passes.
 
-- [ ] Write failing service tests for list/filter/sort, create/edit, repair/clear,
-  archive, stable validation errors, role enforcement, immutable history, and
-  unchanged state after rejected operations.
-- [ ] Use these service boundaries:
+### Task 2.3 — Write the admin correction/CRUD behavior first (35–45m)
 
-  ```python
-  class InventoryService:
-      async def list_items(self, query: InventoryQuery, actor: User) -> list[Hardware]: ...
-      async def create_item(self, command: CreateHardware, actor: User) -> Hardware: ...
-      async def update_item(self, item_id: UUID, command: UpdateHardware, actor: User) -> Hardware: ...
-      async def set_repair(self, item_id: UUID, repair: bool, actor: User) -> Hardware: ...
-      async def archive(self, item_id: UUID, actor: User) -> Hardware: ...
-  ```
+- [ ] In `tests/test_inventory.py`, write
+      `test_admin_inventory_writes_preserve_raw_evidence` as one browser-level HTTP
+      scenario.
+- [ ] Use one journey: an ordinary user is denied the correction POST; an admin
+      corrects source `10` with canonical brand, ISO date, and valid status; exactly
+      its three repairable findings disappear while raw `""`, `null`, and
+      `"Unknown"`, identity, and row count remain unchanged.
+- [ ] Run this one test and confirm it fails before route implementation.
 
-- [ ] Define command ownership explicitly: `CreateHardware` accepts name, brand,
-  purchase date, notes, and initial `Available` or `Repair` status only.
-  `UpdateHardware` accepts canonical name/brand/date/notes/legacy-history
-  corrections and may set status only when correcting an imported null status,
-  again only to `Available` or `Repair`. `raw_payload`, internal/source IDs,
-  holder, archive timestamp, and embedded events are never command fields;
-  `In Use` is reachable only through the rental service.
-- [ ] Re-read and validate inside the shared mutation lock. Non-admin mutations,
-  `In Use` repair/archive attempts, and invalid commands must leave canonical
-  fields, immutable raw payload, and history byte-for-byte unchanged.
-- [ ] Hide archived and canonical-null-status hardware from normal users while
-  retaining both for admin inspection. Append actor-attributed
-  create/update/repair/archive events.
-- [ ] Run: `uv run pytest tests/inventory/test_service.py -q`
-- [ ] Commit with subject `feat(inventory): add guarded management service` and a
-  body describing revalidation under the mutation lock.
+### Task 2.4 — Build the server-rendered inventory slice (45–75m)
 
-### Task 3.4: Dashboard and admin hardware UI
+- [ ] Add authenticated dashboard filtering and sorting for name, brand, purchase
+      date, and status. Accept only an allowlist of sort keys.
+- [ ] Normal users see only records with a non-null canonical status. Administrators
+      see all 11 records and inline finding badges.
+- [ ] Implement one shared create/edit form. Parse the entire submitted form before
+      one TinyDB update so invalid input cannot partially modify a record.
+- [ ] Implement administrator-only create, edit, hard-delete, mark-repair, and
+      clear-repair POST routes with redirect-after-POST.
+- [ ] Do not offer `In Use` as a new administrator-selected state. When a holder is
+      set, allow metadata correction but reject status changes, repair actions, and
+      deletion. Mark repair is holderless `Available → Repair`; clear repair is
+      holderless `Repair → Available`.
+- [ ] On the edit page, show imported and canonical values side by side. Render
+      source `assignedTo` only as `legacy assignee present (redacted)`.
+- [ ] Ensure both source-ID `4` rows have distinct internal-ID edit URLs; source `9`
+      shows raw `22-05-2023` beside an unset canonical date; source `10` visibly
+      shows blank/null/Unknown; and sources `5`/`11` expose safety evidence.
+- [ ] Use `_hardware_table.html` as a Jinja include. Add HTMX table replacement only
+      if full-page filter/edit behavior is already complete; no acceptance criterion
+      depends on JavaScript.
+- [ ] Run both inventory tests until they pass.
 
-**Files:**
+### Task 2.5 — Validate and open PR 2 (75–90m)
 
-- Create: `src/hardware_hub/inventory/routes.py`
-- Create: `src/hardware_hub/templates/inventory/dashboard.html`
-- Create: `src/hardware_hub/templates/inventory/_table.html`
-- Create: `src/hardware_hub/templates/inventory/detail.html`
-- Create: `src/hardware_hub/templates/admin/hardware.html`
-- Create: `src/hardware_hub/templates/admin/hardware_form.html`
-- Create: `tests/inventory/test_routes.py`
-- Modify: `src/hardware_hub/app.py`
-- Modify: `src/hardware_hub/templates/base.html`
-- Modify: `src/hardware_hub/static/app.css`
-- Modify: `README.md`
-- Modify: `docs/AI_DEVELOPMENT_LOG.md`
-- Modify: `docs/PROMPT_TRAIL.md`
+- [ ] Run the full minimal gate and manually execute the correction journey below.
+- [ ] Have the read-only reviewer search specifically for silent-loss traps:
+      dictionary-by-source-ID loading, permissive date parsing, default status,
+      per-row catch-and-skip, full-form replacement, source-ID update queries, or
+      raw HTML sanitization at write time.
+- [ ] Commit with a concise subject and factual body, for example:
 
-- [ ] Write failing route tests for authentication, admin-only mutations, CSRF,
-  sort/filter query parameters, archived/null-status visibility, Jinja escaping,
-  assignee display, history display, and equal item ordering/content between
-  full-page and HTMX table responses.
-- [ ] Implement server-side filtering and sorting by name, brand, purchase date,
-  and status. HTMX requests replace `_table.html`; ordinary requests render the
-  same table inside `dashboard.html`.
-- [ ] Use these explicit routes: `GET /hardware`;
-  `GET /hardware/{item_id}` for status and attributable immutable history;
-  `GET /admin/hardware`; `GET /admin/hardware/new`; `POST /admin/hardware`;
-  `GET /admin/hardware/{item_id}/edit`; and CSRF-protected POST routes ending in
-  `/update`, `/repair`, `/clear-repair`, and `/archive` for existing items.
-- [ ] Show invalid imported values and rule findings to administrators instead
-  of coercing or hiding them. Provide add/edit/repair/archive forms with inline
-  errors and post-success redirects or fragment refreshes.
-- [ ] Include the required assignee column. Normal users see `You`, `Assigned`,
-  or `Unresolved legacy assignment`; admins may also see the resolvable account
-  email. Never render the raw legacy assignee email for an unresolved record.
-- [ ] Update implementation status and record the actual data/rules prompts,
-  trade-offs, and corrections made during this slice.
-- [ ] Run all inventory tests and the full validation gate.
-- [ ] Commit with subject `feat(inventory): add dashboard and admin controls` and
-  a body describing full-page/HTMX equivalence.
+```text
+feat(inventory): expose dirty seed
 
-### Slice 3 acceptance and PR
+Preserves all eleven source records, computes objective findings on demand, and
+adds the dashboard plus administrator correction and CRUD flows.
+```
 
-- [ ] Manually verify all 11 records, both duplicate IDs, filters, sorting,
-  admin edit/repair/archive, narrow layout, and escaped dirty text.
-- [ ] Confirm rejected admin operations cause no database changes.
-- [ ] Open the PR with this DAG:
+- [ ] Push and open one PR with this DAG:
 
-  ```mermaid
-  flowchart LR
-      Seed["Exact dirty seed"] --> Canonical["Canonical + raw records"]
-      Canonical --> Rules["Deterministic findings"]
-      Rules --> Guard["Reusable rentability"]
-      Canonical --> Service["Inventory service"]
-      Service --> UI["Dashboard + admin HTMX"]
-  ```
+```mermaid
+flowchart LR
+    Fixture["11 raw objects"] --> Import["Lossless bulk import"]
+    Import --> Canonical["Editable canonical fields"]
+    Import --> Raw["Immutable source evidence"]
+    Canonical --> Rules["8 deterministic rules"]
+    Raw --> Rules
+    Rules --> AdminUI["Dashboard + correction UI"]
+```
 
-- [ ] Stop for user review and merge.
+**Manual smoke:** admin sees exactly 11 rows; duplicate source IDs have different
+edit links; source `9`, source `10`, and safety evidence are visible; source `7`'s
+email is not rendered; correcting source `10` clears exactly three findings while
+the original values remain; create/edit/repair/clear/delete work on a holderless
+manual row; invalid input makes no partial change; a normal user sees no
+canonical-null row or mutation controls.
+
+**Review gate:** Stop and wait for user approval and merge.
 
 ---
 
-## Slice 4: Atomic Rent and Return Lifecycle
+## Slice 3 — Safe Rent/Return and History
 
-**Branch:** `codex/04-rental-engine`
+- **Branch:** `codex/03-rental`
+- **Timebox:** 55 minutes
+- **Outcome:** An ordinary user can rent a safe available item and return only their
+  own rental; every accepted action becomes visible history.
 
-**Outcome:** A created user can rent safe available hardware and return their
-own item; impossible or unauthorized transitions are rejected atomically and
-the complete action history remains attributable.
+### Files
 
-**Agent allocation:** Separate agents own the state machine, HTTP/UI controls,
-and browser journey in that order; concurrency and authorization reviewers then
-run in parallel.
+Create:
 
-### Task 4.1: Rental state machine and concurrency tests
+```text
+src/hardware_hub/rental.py
+src/hardware_hub/templates/hardware_detail.html
+tests/test_rental.py
+```
 
-**Files:**
+Modify `app.py`, `dashboard.html`, `_hardware_table.html`, and `app.css` only for
+route registration and contextual actions.
 
-- Create: `src/hardware_hub/rentals/__init__.py`
-- Create: `src/hardware_hub/rentals/service.py`
-- Create: `tests/rentals/test_service.py`
+### Mutation contract
 
-- [ ] Write failing tests for success, already-rented conflict, repair, null
-  status, archived, sources `5` and `11`, own return, another user's return
-  denial, admin force-return, and unchanged state/history for every failure.
-- [ ] Write the concurrency test before implementation:
+```text
+POST /hardware/{internal_id}/rent
+POST /hardware/{internal_id}/return
+GET  /hardware/{internal_id}
+```
 
-  ```python
-  first_task = asyncio.create_task(service.rent(item_id, first_user))
-  await repository.first_read_reached.wait()
+Rent succeeds only when the freshly read record has canonical status `Available`,
+no holder, and no critical deterministic finding. Return succeeds only when the
+freshly read holder is the active user. A successful event contains type, user ID,
+and UTC timestamp; rent sets `In Use`, return sets `Available`.
 
-  second_task = asyncio.create_task(service.rent(item_id, second_user))
-  await asyncio.sleep(0)
-  assert repository.read_count == 1  # second request is blocked by the lock
+Use an `async` route whose synchronous re-read/validate/update helper contains no
+`await`, and run one Uvicorn worker. This narrows the obvious race window but does
+not claim transactional concurrency.
 
-  repository.release_first_read.set()
-  first, second = await asyncio.gather(first_task, second_task, return_exceptions=True)
+### Task 3.1 — Write the full rental journey first (0–12m)
 
-  assert sum(isinstance(result, Hardware) for result in (first, second)) == 1
-  assert sum(isinstance(result, StateConflict) for result in (first, second)) == 1
-  stored = await repository.get(item_id)
-  event = stored.events_of("rent").one()
-  assert event.actor_user_id == stored.current_holder_user_id
-  ```
+- [ ] In `tests/test_rental.py`, write
+      `test_rent_and_return_enforce_safety_ownership_and_history`.
+- [ ] Use one journey: source `5` is rejected without mutation; one safe available
+      record rents; a second user cannot return it; the owner returns it; and the
+      ordered rent/return events contain the correct user IDs.
+- [ ] Run the test and confirm it fails before implementation.
 
-- [ ] Back this test with an async pausing repository fake whose first read waits
-  on the two events shown above. Without the mutation lock the second request
-  reaches the same pre-write state and `read_count == 1` fails; a merely
-  sequential `asyncio.gather` test is not sufficient evidence.
-- [ ] Implement `rent` and `return_item` so each acquires the shared lock,
-  re-reads the item, recomputes deterministic rentability, validates actor and
-  state, then persists canonical state plus one embedded event in one repository
-  operation.
-- [ ] A user may return only their own rental. An admin may force-return and the
-  event details must distinguish the override without exposing secrets.
-- [ ] Returning clears holder, sets `Available`, and appends exactly one event.
-- [ ] Run: `uv run pytest tests/rentals/test_service.py -q`
-- [ ] Commit with subject `feat(rentals): add atomic rent and return flow` and a
-  body explaining the single-process concurrency guarantee.
+### Task 3.2 — Implement one mutation path (12–32m)
 
-### Task 4.2: Rental controls and stable HTTP failures
+- [ ] In `rental.py`, implement small domain helpers that take a freshly loaded
+      record and deterministic findings, returning either one complete replacement
+      payload or a user-facing error.
+- [ ] Implement authenticated POST routes by internal ID. Re-read inside the helper
+      immediately before one update and redirect to the detail page afterward.
+- [ ] Never rely on a disabled button or stale list-page status for authorization or
+      safety.
+- [ ] Keep legacy `assignedTo` unresolved. An administrator may explicitly correct
+      the canonical status through Slice 2; never auto-link an email to an account.
+- [ ] Run the rental test until it passes.
 
-**Files:**
+### Task 3.3 — Expose actions and history (32–43m)
 
-- Create: `src/hardware_hub/rentals/routes.py`
-- Create: `src/hardware_hub/templates/inventory/_rental_action.html`
-- Create: `src/hardware_hub/templates/inventory/_action_error.html`
-- Create: `tests/rentals/test_routes.py`
-- Modify: `src/hardware_hub/inventory/routes.py`
-- Modify: `src/hardware_hub/templates/inventory/_table.html`
-- Modify: `src/hardware_hub/templates/inventory/detail.html`
-- Modify: `src/hardware_hub/app.py`
+- [ ] Add contextual rent/return forms to the dashboard and detail page, with clear
+      disabled reasons when an item is unsafe or unavailable.
+- [ ] Render newest-first application history without exposing legacy assignee
+      emails. Keep the raw imported history visible to administrators as evidence.
+- [ ] Verify every state-changing control is a POST form and still works without
+      HTMX.
 
-- [ ] Write failing direct-request tests proving hidden buttons cannot bypass
-  authorization, state, deterministic safety, or CSRF guards.
-- [ ] Map domain outcomes consistently: unauthenticated to redirect/401 by
-  content negotiation, forbidden to 403, missing to 404, invalid form to 422,
-  and stale/impossible state to 409. HTMX failures replace only the action area.
-- [ ] Expose only CSRF-protected `POST /hardware/{item_id}/rent` and
-  `POST /hardware/{item_id}/return`; there are no state-changing GET routes.
-- [ ] Render Rent only for apparently rentable items, Return only for the current
-  renter, and Force return only for admins. Keep the backend authoritative.
-- [ ] Render rent/return events on the existing hardware detail page with action,
-  timestamp, and actor attribution; route tests must see those events after the
-  corresponding POST.
-- [ ] Run route tests and the full validation gate.
-- [ ] Commit with subject `feat(rentals): add guarded HTMX controls` and a body
-  describing domain-to-HTTP error mapping.
+### Task 3.4 — Validate and open PR 3 (43–55m)
 
-### Task 4.3: Browser user journey
+- [ ] Run the complete minimal gate and the manual two-user journey.
+- [ ] Have the read-only reviewer check server-side ownership, fresh re-read,
+      deterministic safety enforcement, single-update behavior, and event ordering.
+- [ ] Commit with a concise subject and factual body, for example:
 
-**Files:**
+```text
+feat(rental): add guarded circulation
 
-- Create: `tests/e2e/conftest.py`
-- Create: `tests/e2e/test_user_journey.py`
-- Modify: `pyproject.toml`
-- Modify: `.github/workflows/ci.yml`
-- Modify: `README.md`
-- Modify: `docs/AI_DEVELOPMENT_LOG.md`
-- Modify: `docs/PROMPT_TRAIL.md`
+Adds server-enforced rent and return transitions, owner checks, deterministic
+safety blocking, and visible application history.
+```
 
-- [ ] Add `pytest-playwright` to the development dependencies, refresh
-  `uv.lock`, and mark browser tests `e2e`. In `tests/e2e/conftest.py`, start the
-  app on an ephemeral localhost port with a temporary TinyDB path and stop it
-  deterministically after the test session.
-- [ ] Write one browser test that starts with the bootstrap admin, creates a
-  normal user, logs out, logs in as that user, rents source `1`, verifies `In
-  Use`, returns it, and verifies `Available` plus rent/return history.
-- [ ] Install only Chromium in CI with
-  `uv run playwright install --with-deps chromium`. Keep this test in the same
-  job and reuse the temporary TinyDB fixture; do not add a browser matrix.
-- [ ] Update implementation status and record the actual rental/E2E prompts,
-  trade-offs, and corrections made during this slice.
-- [ ] Run: `uv run pytest tests/e2e/test_user_journey.py -q`
-- [ ] Run the complete global validation gate after the dependency, lockfile,
-  workflow, documentation, and E2E changes.
-- [ ] Commit with subject `test(e2e): cover account and rental journey` and a
-  body identifying the one cross-slice path it protects.
+- [ ] Push and open one PR with this DAG:
 
-### Slice 4 acceptance and PR
+```mermaid
+flowchart LR
+    Request --> Reload["Fresh TinyDB record"]
+    Reload --> Rules["Status + holder + safety rules"]
+    Rules -->|allow| Update["One state/history update"]
+    Rules -->|deny| Error["Visible error; no write"]
+```
 
-- [ ] Run the concurrency test repeatedly and confirm one holder/one rent event.
-- [ ] Manually rent/return at desktop and narrow widths and inspect history.
-- [ ] Open the PR with this DAG:
+**Manual smoke:** user rents one safe item; another user cannot return it; owner
+returns it; rent/return history is visible; sources `5` and `11` remain blocked even
+after editable notes are cleared; admin inventory controls still work.
 
-  ```mermaid
-  flowchart LR
-      Request["Rent/return request"] --> Lock["Shared mutation lock"]
-      Lock --> Read["Re-read current item"]
-      Read --> Rules["Auth + state + safety guards"]
-      Rules --> Write["State + one history event"]
-      Write --> Fragment["HTMX action result"]
-  ```
-
-- [ ] Stop for user review and merge.
+**Review gate:** Stop and wait for user approval and merge.
 
 ---
 
-## Slice 5: Hybrid Auditor and Release Handoff
+## Slice 4 — Deterministic/LLM Audit, Documentation, and Railway Readiness
 
-**Branch:** `codex/05-auditor-release`
+- **Branch:** `codex/04-audit-release`
+- **Timebox:** 75 minutes of implementation; external deployment latency excluded
+- **Outcome:** Administrators receive deterministic findings with an optional LLM
+  second opinion, and a reviewer can run or deploy the Railway-ready product from
+  honest docs.
 
-**Outcome:** An administrator can run a read-only audit that always returns
-deterministic findings and, when configured, exactly one validated LLM
-enrichment request. Provider failure cannot corrupt data or block the core app,
-and the same PR completes the explicitly approved public Railway release.
+### Files
 
-**Agent allocation:** Separate agents own the LLM adapter, audit service/UI, and
-release documentation in dependency order. Privacy/security and deployment
-reviewers run in parallel; only the root performs external publication actions.
+Create:
 
-### Task 5.1: Allowlisted LLM contract and adapter
+```text
+README.md
+railway.toml
+src/hardware_hub/audit.py
+src/hardware_hub/templates/audit.html
+tests/test_audit.py
+```
 
-**Files:**
+Modify `.env.example`, `app.py`, `base.html`, and `app.css` only for configuration,
+route registration, navigation, and finding presentation.
 
-- Create: `src/hardware_hub/audit/__init__.py`
-- Create: `src/hardware_hub/audit/models.py`
-- Create: `src/hardware_hub/audit/llm.py`
-- Create: `tests/audit/test_llm.py`
-- Modify: `src/hardware_hub/config.py`
-- Modify: `.env.example`
-- Modify: `docs/railway.env.example`
+### Audit contract
 
-- [ ] Write failing adapter tests for exactly one request; entirely missing and
-  every partially configured three-variable provider combination; production
-  HTTP/non-HTTPS rejection; HTTP 4xx/5xx; transport error; a slow-drip response
-  crossing a 10-second wall-clock deadline; a response over 256 KiB; malformed
-  JSON; invalid severity; unknown hardware IDs; and secret-free errors/logs. Use
-  HTTPX `MockTransport`; never call a live endpoint.
-- [ ] Define an outbound DTO by allowlist, not by serializing storage models:
+Routes:
 
-  ```python
-  class AuditItem(BaseModel):
-      hardware_id: UUID
-      name: str | None
-      brand: str | None
-      purchase_date: date | None
-      status: HardwareStatus | None
-      notes: str | None
-      legacy_history: str | None
-      has_resolvable_holder: bool
+```text
+GET  /admin/audit             deterministic results; admin only
+POST /admin/audit/llm         deterministic + optional LLM; admin only
+```
 
-  class AuditRequest(BaseModel):
-      items: list[AuditItem]
-      deterministic_findings: list[OutboundDeterministicFinding]
-  ```
+Use one response schema:
 
-- [ ] Pass every outbound string, including names, brands, notes, legacy history,
-  deterministic evidence, and explanations, through one redactor for email
-  addresses, authorization headers, common password/token/key assignments, and
-  known provider-key formats. Prove fixtures embedding those values serialize
-  only redaction markers. The DTO never contains user ID, session fields, raw
-  holder identity, configuration values, or the full raw payload.
-- [ ] Use this exact OpenAI-compatible wire contract: treat `LLM_BASE_URL` as a
-  versioned base such as `https://api.openai.com/v1`; POST once to
-  `{LLM_BASE_URL.rstrip('/')}/chat/completions` with `model`, `temperature: 0`, a
-  fixed system message, and `AuditRequest.model_dump_json()` as the user message.
-  Read `choices[0].message.content` as one JSON object shaped
-  `{"findings": [...]}`. Do not use provider tools or grant write capability.
-- [ ] Parse the provider response into strict Pydantic findings with known
-  hardware IDs, bounded text lengths, at most 100 findings, and
-  `critical | warning | info`. Reject the entire LLM result on schema failure
-  and return a typed provider warning.
-- [ ] Configure `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`; interpolate the
-  API key only into the Authorization header and never into exceptions shown to
-  users. Missing, partial, or production-non-HTTPS configuration performs zero
-  HTTP requests and yields a non-blocking provider warning.
-- [ ] Wrap the streamed HTTPX request in an outer `asyncio.timeout(10)` wall-clock
-  deadline as well as HTTPX operation timeouts; abort once cumulative response
-  bytes exceed 256 KiB. A peer that trickles bytes cannot extend the total
-  deadline.
-- [ ] Run: `uv run pytest tests/audit/test_llm.py -q`
-- [ ] Commit with subject `feat(audit): add safe LLM adapter` and a body
-  describing the allowlisted payload and fail-closed output validation.
+```python
+class LLMFinding(BaseModel):
+    hardware_id: UUID
+    severity: Literal["critical", "warning", "info"]
+    explanation: str
+    recommendation: str
 
-### Task 5.2: Read-only audit orchestration and admin UI
 
-**Files:**
+class LLMAuditResponse(BaseModel):
+    findings: list[LLMFinding]
+```
 
-- Create: `src/hardware_hub/audit/service.py`
-- Create: `src/hardware_hub/audit/routes.py`
-- Create: `src/hardware_hub/templates/admin/audit.html`
-- Create: `src/hardware_hub/templates/admin/_audit_results.html`
-- Create: `tests/audit/test_service.py`
-- Create: `tests/audit/test_routes.py`
-- Modify: `src/hardware_hub/app.py`
-- Modify: `src/hardware_hub/templates/base.html`
-- Modify: `src/hardware_hub/static/app.css`
+The allowlisted request snapshot contains internal hardware ID, canonical fields,
+notes, legacy history, `legacy_assignee_present: bool`, and deterministic findings.
+It excludes user documents, password hashes, session/cookie values, secrets, and
+the legacy assignee email. Notes/history remain a documented free-text privacy
+risk because interpreting them is the feature.
 
-- [ ] Write failing tests proving non-admin denial, deterministic results with no
-  provider config, exactly one adapter call when configured, visible provider
-  warning on failure, and identical inventory snapshots before/after every
-  audit outcome.
-- [ ] Under the mutation lock, read a consistent inventory snapshot and compute
-  anonymous holder-resolvability. Release the lock before the HTTP request.
-- [ ] Always run `audit_inventory` with the same `RuleContext` contract from
-  Slice 3 and preserve its complete result. Put its redacted deterministic
-  findings into `AuditRequest`, then merge valid LLM findings for display only;
-  never feed them into rentability or repository writes.
-- [ ] Use `GET /admin/audit` for the empty/explanatory page and CSRF-protected
-  `POST /admin/audit` as the only operation that invokes the adapter.
-- [ ] Render findings grouped by deterministic/AI source and severity, with
-  evidence, explanation, recommended action, provider warning, and admin edit
-  links. Protect the trigger with admin role and CSRF.
-- [ ] Run all audit tests and verify a simulated 10-second timeout does not hold
-  the mutation lock by completing an independent write during the pending mock.
-- [ ] Commit with subject `feat(audit): add hybrid inventory review` and a body
-  explaining deterministic continuity and read-only AI behavior.
+Make one OpenAI-compatible request to
+`{LLM_BASE_URL.rstrip('/')}/chat/completions` with a ten-second HTTPX timeout. Parse
+`choices[0].message.content` through the schema and reject findings whose hardware
+ID is not in the submitted snapshot. Missing config, transport errors, non-JSON,
+or schema errors become one visible warning. Deterministic findings remain intact,
+and no audit path writes to inventory.
 
-### Task 5.3: Release documentation and Railway verification
+### Task 4.1 — Write fallback/non-mutation behavior first (0–12m)
 
-**Files:**
+- [ ] In `tests/test_audit.py`, write
+      `test_audit_falls_back_without_mutating_inventory`.
+- [ ] Configure one failing mock transport. Capture inventory before the request;
+      assert deterministic findings and one provider warning remain afterward, and
+      inventory is exactly unchanged.
+- [ ] From that same captured request, assert the snapshot contains no user email,
+      password hash, secret, cookie, or raw `assignedTo` value.
+- [ ] Run the test and confirm it fails before implementation.
 
-- Modify: `README.md`
-- Modify: `docs/AI_DEVELOPMENT_LOG.md`
-- Modify: `docs/PROMPT_TRAIL.md`
-- Create: `docs/DEPLOYMENT.md`
-- Create: `docs/RELEASE_CHECKLIST.md`
-- Modify: `tests/test_deployment_contract.py`
+### Task 4.2 — Implement the read-only audit (12–35m)
 
-- [ ] Finalize the assignment-required README sections: fully implemented,
-  shortcuts/hacks with why/future, partial or missing work, top three next-day
-  priorities, setup, tests, architecture, demo credentials strategy, and live
-  link status. Before external approval it must truthfully say the demo is not
-  yet published; update it with the verified URL on this same branch before the
-  PR is approved and merged.
-- [ ] Record at least one concrete AI correction: the initial hardware-only lock
-  idea was unsafe because TinyDB rewrites the shared file, so implementation
-  serializes every TinyDB mutation.
-- [ ] Document Railway setup exactly: one service/replica, one worker, one
-  `/data` volume, platform-provided `RAILWAY_VOLUME_MOUNT_PATH=/data`,
-  `ENVIRONMENT=production`, `TINYDB_PATH=/data/hardware-hub.json`, bootstrap
-  secrets, LLM secrets, a generated public domain, health check, startup seeding,
-  persistence/redeploy check, and rollback note. Do not use a pre-deploy command
-  because the volume is unavailable there.
-- [ ] Document platform limits honestly: a mounted volume prevents horizontal
-  replicas; volume-backed redeploys have brief downtime; Railway health checks
-  gate deployment startup rather than continuously monitoring the service; code
-  rollback does not roll back the TinyDB file, so back up the volume before a
-  risky release.
-- [ ] Add a release checklist for full tests, `git diff --check`, dependency
-  review, `gitleaks git . --log-opts="--all" --redact --exit-code 1` after
-  fetching all remote refs/tags, manual review of publishable seed/AI-log/prompt
-  content for PII or proprietary data, manual auth/inventory/rental/audit smoke
-  tests, persistent data after redeploy, generated-domain health verification,
-  and a recorded exact release SHA.
-- [ ] Run the full validation gate and the complete browser test on the final
-  candidate.
-- [ ] Commit with subject `docs(release): add deployment and assessment handoff`
-  and a body listing verified behavior and explicit MVP limits.
+- [ ] Implement deterministic audit rendering first by reusing `find_issues`; do not
+      duplicate rule logic.
+- [ ] Implement one snapshot builder, one HTTP call function with an injectable/mock
+      transport, and one response parser. Do not add retries, streaming, token
+      budgets, background jobs, provider adapters, or stored audit runs.
+- [ ] Catch configuration, HTTP, JSON, and Pydantic failures at the audit boundary
+      and return one concise warning beside the deterministic results.
+- [ ] Add the admin-only page and action. Make it obvious which findings are
+      deterministic and which are suggestions.
+- [ ] Run the audit test until it passes.
 
-### Slice 5 acceptance and PR
+### Task 4.3 — Write the assessment README (35–50m)
 
-- [ ] Confirm no live LLM call occurs in tests and no provider error exposes the
-  configured key.
-- [ ] Confirm inventory data is identical before and after successful, failed,
-  and malformed audits.
-- [ ] Run the complete release checklist except the external publication and
-  Railway-launch steps.
-- [ ] Open Slice 5 as a draft PR with this DAG:
+- [ ] Document prerequisites, `uv sync --locked`, environment variables, startup,
+      bootstrap login, tests, and the four-step manual product journey.
+- [ ] Include required assessment sections: implemented behavior; shortcuts and why;
+      partial/missing work; top three next-24-hour improvements; AI tooling used;
+      data strategy; representative prompt trail; and corrections made after review.
+- [ ] State explicitly: signed-cookie limitations, no full CSRF defense, single-worker
+      TinyDB constraint, hard-delete limitation, raw free-text privacy risk, LLM
+      non-authority, and lack of automated browser tests.
+- [ ] Do not claim a live URL, passed check, or production guarantee until verified.
 
-  ```mermaid
-  flowchart LR
-      Trigger["Admin audit trigger"] --> Snapshot["Locked inventory snapshot"]
-      Snapshot --> Rules["Deterministic findings"]
-      Snapshot --> DTO["Allowlisted anonymous DTO"]
-      DTO --> LLM["One bounded LLM call"]
-      LLM --> Validate["Strict output validation"]
-      Rules --> Report["Read-only report"]
-      Validate --> Report
-      Failure["Provider failure"] --> Report
-  ```
+### Task 4.4 — Add the narrow Railway contract (50–60m)
 
-- [ ] Stop for user review and request explicit release approval while this same
-  PR remains open. Do not publish or deploy merely because code review passes.
-- [ ] After approval, fetch all remote refs and tags, run the full-history secret
-  scan at the exact release SHA, and present the seed (including its
-  internal-looking email), AI log, and prompt trail for the user's explicit
-  public-content confirmation before changing repository visibility.
-- [ ] On confirmation, make the repository public and configure Railway to deploy
-  the Slice 5 branch with one replica/worker, the `/data` volume, production
-  variables/secrets, no pre-deploy command, and a generated public domain.
-- [ ] Verify `/health`, bootstrap/admin flow, user rent/return, deterministic and
-  provider audit paths, secret-free errors, and TinyDB persistence across a
-  redeploy. Create a manual Railway volume backup before the redeploy test.
-- [ ] Put the verified public URL and release evidence into README/docs on this
-  same branch, push the same PR, rerun CI and the release checklist, and request
-  the user's final PR approval.
-- [ ] After the user merges PR 5, switch Railway's source branch to `main` (or
-  redeploy merged `main`) and verify the same domain and persisted data. No sixth
-  code/documentation PR is expected.
+- [ ] Configure one service command:
 
-## Final Plan Review Checklist
+```text
+uv run uvicorn --app-dir src hardware_hub.app:app --host 0.0.0.0 --port $PORT --workers 1
+```
 
-- [ ] All assignment pillars map to a slice and acceptance test.
-- [ ] No later slice is required for an earlier PR's advertised outcome.
-- [ ] Auth precedes every business-data route.
-- [ ] Deterministic safety rules precede and are reused by rentals.
-- [ ] The browser journey lands with the complete rent/return feature.
-- [ ] LLM output is read-only and does not participate in rental guards.
-- [ ] Every TinyDB mutation uses the shared lock; the LLM call does not hold it.
-- [ ] No task contains placeholder paths, undecided interfaces, or live secrets.
-- [ ] Every slice ends in full validation, one PR, and a user review gate.
+- [ ] Document a mounted volume with `TINYDB_PATH=/data/hardware-hub.json`, required
+      session/bootstrap secrets, optional LLM settings, and `/health`.
+- [ ] Do not add a runtime `/data` path guard, backup automation, deploy workflow,
+      multiple replicas, or automatic secret creation.
+
+### Task 4.5 — Validate and open PR 4 (60–75m)
+
+- [ ] Run the full minimal gate from a clean environment and perform the entire
+      manual smoke path: bootstrap login → create user → inspect/correct dirty data
+      → rent/return → deterministic audit with no LLM configuration.
+- [ ] Have the read-only reviewer compare the implementation, README claims, privacy
+      allowlist, and Railway command with the accepted design.
+- [ ] Commit with a concise subject and factual body, for example:
+
+```text
+feat(audit): complete MVP handoff
+
+Adds deterministic and optional LLM audit output, deployment configuration, and
+assessment documentation with explicit security and operational trade-offs.
+```
+
+- [ ] Push and open one PR with this DAG:
+
+```mermaid
+flowchart LR
+    TinyDB --> Snapshot["Allowlisted read-only snapshot"]
+    Snapshot --> Rules["Deterministic findings"]
+    Snapshot --> LLM["Optional LLM request"]
+    Rules --> AuditUI["Admin audit page"]
+    LLM --> AuditUI
+    Railway["1 worker + /data volume"] --> App["FastAPI MVP"]
+```
+
+- [ ] Wait for explicit user approval before publishing externally. Railway build,
+      provisioning, and URL verification do not consume the five-hour coding budget.
+- [ ] After approved publication, verify `/health`, log in, perform one safe
+      rent/return, exercise the LLM once if credentials were supplied, redeploy once,
+      and confirm the data persists. Record only verified results and URL in the PR.
+
+**Manual smoke:** all earlier journeys still work; deterministic findings appear
+without any LLM settings; Railway configuration names one worker and `/data`.
+
+**Review gate:** Stop for final user review. The MVP is complete only after the PR
+is approved, publication (if requested) is verified, and the documented checks are
+truthful.
+
+---
+
+## Ruthless Scope-Cut Order
+
+If a slice approaches its timebox, cut in this order:
+
+1. extra spacing, color, and responsive polish;
+2. HTMX replacement behavior—full-page Jinja flows remain authoritative;
+3. additional filters, explanatory prose, or LLM prompt sophistication;
+4. helper abstractions that do not remove repeated product behavior.
+
+Never cut the working vertical journey, exact 11-record preservation, visible dirty
+evidence, source `10` correction demonstration, deterministic rental safety, the
+five behavior tests, honest trade-offs, or deployable one-worker configuration.
+
+## Final Definition of Done
+
+- Four PRs, each based on reviewed `main`, each with one local-scope DAG.
+- All five behavior tests plus Ruff pass locally and in minimal CI.
+- All 11 source records import without silent correction or duplicate loss.
+- Browser evidence shows original versus canonical values and redacts the legacy
+  email without changing stored data.
+- Login, admin user creation, inventory CRUD/correction, rent/return/history, and
+  deterministic audit work end to end.
+- LLM absence or failure is visible and non-destructive.
+- README tells the truth about shortcuts, missing work, AI usage, and next steps.
+- Railway is configured for one worker and a `/data` volume; external publication
+  happens only with explicit approval.

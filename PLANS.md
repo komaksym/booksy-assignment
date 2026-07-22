@@ -1,104 +1,114 @@
-# Hardware Hub Delivery Roadmap
+# Hardware Hub Five-Hour Roadmap
 
-## Summary
+## Delivery Principle
 
-Deliver the approved Hardware Hub design as five sequential, independently
-reviewable pull requests. Each pull request is a working vertical slice, is
-validated by the same minimal CI gate, and must be reviewed and merged before
-the next branch starts.
+Ship a complete vertical product and make the malformed seed the centerpiece of
+the engineering story. Architecture exists only to keep the code understandable
+for four small pull requests; explicit shortcuts are preferable to unfinished
+infrastructure.
 
-The executable task-by-task plan lives in
+The executable plan lives in
 [`docs/superpowers/plans/2026-07-22-hardware-hub-roadmap.md`](docs/superpowers/plans/2026-07-22-hardware-hub-roadmap.md).
+
+## Artifacts
+
+- [Reference UI mockup](docs/assets/hardware-hub-reference-ui.png) — visual
+  direction for Slice 1's shell and Slice 2's dashboard/admin screens. It is a
+  styling and layout reference, not an expansion of the MVP feature scope.
 
 ## Pull Request Sequence
 
 | Slice | Branch | Target | Reviewable outcome | Status |
 | --- | --- | ---: | --- | --- |
-| 1 | `codex/01-foundation-ci` | 45m | Runnable FastAPI skeleton, injectable TinyDB, Railway guardrails, and one-job CI | Approved design; not started |
-| 2 | `codex/02-admin-auth` | 60m | Bootstrap admin, admin-created accounts, opaque-cookie sessions, authorization, and CSRF | Blocked on Slice 1 merge |
-| 3 | `codex/03-inventory-rules` | 75m | Lossless seed import, dashboard, admin hardware management, and deterministic safety rules | Blocked on Slice 2 merge |
-| 4 | `codex/04-rental-engine` | 60m | Atomic rent/return lifecycle, ownership rules, history, and browser journey | Blocked on Slice 3 merge |
-| 5 | `codex/05-auditor-release` | 60m | One-call hybrid audit, safe fallback, final documentation, and verified Railway release | Blocked on Slice 4 merge |
+| 1 | `codex/01-shell-auth` | 80m | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | Not started |
+| 2 | `codex/02-dirty-inventory` | 90m | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Blocked on Slice 1 merge |
+| 3 | `codex/03-rental` | 55m | Guarded rent/return flow with ownership and visible history | Blocked on Slice 2 merge |
+| 4 | `codex/04-audit-release` | 75m | Deterministic/LLM audit, honest documentation, manual smoke verification, and Railway-ready configuration | Blocked on Slice 3 merge |
 
-The implementation target is five hours excluding user review latency and
-external provider waiting. If a timebox is threatened, reduce visual polish or
-extra presentation detail; do not cut authorization, state-transition, lossless
-seed, concurrency, deterministic-audit, or LLM-fallback tests.
+The targets total five implementation hours. User review, CI queueing, dependency
+downloads, and Railway provisioning latency are outside that clock. When a target
+is threatened, reduce visual polish, HTMX enhancement, or abstraction—not the
+working login, dirty-data evidence, rental flow, deterministic fallback, or
+deployability.
 
 ```mermaid
 flowchart LR
-    S1["1. Foundation + CI"] --> S2["2. Admin auth"]
-    S2 --> S3["3. Inventory + rules"]
-    S3 --> S4["4. Rental lifecycle"]
-    S4 --> S5["5. Auditor + release"]
-    S1 -. "review + merge" .-> S2
-    S2 -. "review + merge" .-> S3
-    S3 -. "review + merge" .-> S4
-    S4 -. "review + merge" .-> S5
+    S1["1. Shell + auth"] --> S2["2. Dirty inventory"]
+    S2 --> S3["3. Rental"]
+    S3 --> S4["4. Audit + handoff"]
 ```
 
 ## Mandatory Slice Workflow
 
-Every slice uses `superpowers:subagent-driven-development` and the same
-orchestration contract:
+Each slice still uses sub-agents, but orchestration must not become its own
+project:
 
-1. The root agent updates this tracker, fixes the slice contract, and creates
-   the branch from reviewed `main`.
-2. At least two sub-agents receive self-contained, bounded, non-overlapping
-   responsibilities with `fork_turns="none"`. Parallel edits are allowed only
-   when their file ownership does not overlap.
-3. Fresh read-only sub-agents review specification coverage and code/security
-   quality in parallel.
-4. The root agent resolves findings, runs the full validation gate, commits,
-   pushes, and opens exactly one pull request.
-5. The pull request contains a small Mermaid DAG showing the slice's system
-   flow, plus factual validation results and risks.
-6. Work stops until the user reviews and merges or requests changes. No stacked
-   implementation pull requests are opened.
+1. Start the branch from reviewed and merged `main`.
+2. Give at least one implementation sub-agent a bounded feature or test task.
+3. Use a fresh read-only sub-agent for one specification/quality review.
+4. Parallelize only clearly disjoint files; the root agent owns integration.
+5. Run the minimal gate, perform the slice's manual smoke check, and open one PR
+   with a small Mermaid DAG.
+6. Stop for user review before starting the next branch.
 
-Only the root agent owns Git integration. Sub-agents do not commit, push, or
-open pull requests from the shared worktree.
+Sub-agents do not commit, push, or open PRs from the shared worktree.
 
-## Minimal CI Gate
+## Minimal CI
 
-Keep one Ubuntu job on pull requests and pushes to `main`; do not add matrices,
-coverage SaaS, preview environments, or deployment automation.
+One Ubuntu job runs on pull requests and pushes to `main`:
 
 ```text
-uv sync --locked --all-extras
+uv sync --locked
 uv run ruff format --check .
 uv run ruff check .
-uv run mypy src
 uv run pytest -q
-uv build
 ```
 
-Slice 4 adds Chromium installation to this same job so the single browser
-journey runs in CI. Tests never call a live LLM or write to the developer or
-Railway database.
+There is no matrix, coverage service, mypy job, package-build job, Playwright,
+preview environment, or deployment automation.
 
-## Global Definition of Done
+## Five Automated Tests That Matter
 
-- The slice works end to end and includes its negative-path tests.
-- Every TinyDB write, including bootstrap, users, sessions, inventory, and
-  history, is serialized through the shared process-wide mutation lock.
-- The full CI command set passes with no skipped critical tests.
-- UI-changing slices receive a browser smoke check at desktop and narrow widths.
-- README and AI-development notes are updated while decisions are fresh.
-- The PR body follows the repository template and contains its slice DAG.
-- The next slice remains untouched until this PR is approved and merged.
+1. An admin creates a user; both can log in, while the ordinary user is denied an
+   admin mutation.
+2. All eleven source records survive idempotent loading; both duplicate IDs and
+   the exact deterministic findings remain visible.
+3. Canonical admin correction of source `10` clears its three repairable findings
+   without rewriting the preserved raw source; unauthorized writes fail.
+4. One unsafe item is blocked; a safe item completes the owner-only rent/return
+   journey with history.
+5. One LLM provider failure leaves deterministic audit results and inventory
+   intact.
+
+Tests can contain several assertions around one behavior. The goal is evidence,
+not test-count inflation.
+
+## Definition of Done
+
+- The slice provides its advertised browser-visible behavior end to end.
+- The relevant automated test passes, along with the complete small suite.
+- Desktop and narrow-width manual smoke checks pass for changed screens.
+- README and AI-development notes record actual shortcuts and corrections.
+- The PR describes what works, what was deliberately omitted, validation, and a
+  small dependency/data-flow DAG.
+- The next slice remains untouched until review and merge.
+
+## Explicitly Removed From the Implementation Contract
+
+- persisted opaque sessions and session repositories;
+- synchronizer CSRF tokens;
+- global mutation coordinators and concurrency stress harnesses;
+- a migration framework beyond idempotent first-run seed loading;
+- hardened LLM redaction, streaming, byte-limit, or deadline infrastructure;
+- runtime Railway volume-path guards and backup automation;
+- automated browser testing;
+- broad unit coverage for every helper or failure category.
+
+These omissions are documented assessment trade-offs, not accidental gaps.
 
 ## Release Boundary
 
-`railway.toml` can define the build, start command, and health check. Railway
-volume attachment and secrets are external settings, so Slice 5 includes an
-explicit setup and verification checklist. Production startup must reject a
-TinyDB path outside `RAILWAY_VOLUME_MOUNT_PATH`, preventing accidental writes
-to ephemeral storage.
-
-Changing the GitHub repository from private to public and launching the live
-service are external publication actions. Slice 5 opens as a draft, pauses for
-the user's explicit release approval, performs a full-history secret/content
-review, deploys and records the verified URL on that same branch, then returns
-for final review and merge. This keeps release completion inside the fifth PR;
-no sixth documentation PR is planned.
+Slice 4 produces Railway-ready configuration within its 75-minute code
+budget. External publication and its unpredictable build/provisioning latency
+occur only after explicit user approval. Repository visibility changes and
+Railway secrets remain user-controlled actions.
