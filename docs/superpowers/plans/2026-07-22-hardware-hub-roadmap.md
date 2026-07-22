@@ -135,6 +135,7 @@ src/hardware_hub/db.py
 src/hardware_hub/static/app.css
 src/hardware_hub/templates/base.html
 src/hardware_hub/templates/login.html
+src/hardware_hub/templates/home.html
 src/hardware_hub/templates/admin_users.html
 tests/conftest.py
 tests/test_auth.py
@@ -152,6 +153,7 @@ Routes:
 GET  /health                 public, returns {"status": "ok"}
 GET  /login                  public login page
 POST /login                  verifies active user and sets signed session
+GET  /                       authenticated confirmation page
 POST /logout                 clears session
 GET  /admin/users            admin only
 POST /admin/users            admin only; creates active user
@@ -159,15 +161,18 @@ POST /admin/users            admin only; creates active user
 
 ### Task 1.1 — Scaffold the runnable service (0–15m)
 
-- [ ] Create `pyproject.toml` with only the runtime and development dependencies
-      listed in the tech stack; configure Ruff for Python 3.12 and pytest's source
-      path.
+- [ ] Create `pyproject.toml` with Slice 1 runtime dependencies only: FastAPI,
+      Uvicorn, Jinja2, TinyDB, Pydantic Settings, pwdlib with Argon2,
+      python-multipart, and itsdangerous. Development dependencies are pytest,
+      Ruff, and HTTPX for TestClient. Do not add HTMX or LLM-specific code.
+      Configure Ruff for Python 3.12 and pytest's source path.
 - [ ] Generate and commit `uv.lock`; never hand-edit it.
 - [ ] In `config.py`, define settings for TinyDB path, session secret, environment,
-      bootstrap email/password, and optional LLM fields. Fail clearly when the
-      session secret or bootstrap credentials are missing.
-- [ ] In `db.py`, expose one TinyDB opener plus named `users` and `hardware` table
-      helpers. Do not create repositories or a unit of work.
+      and bootstrap email/password. Fail clearly when the session secret or
+      bootstrap credentials are missing. LLM settings belong to Slice 4.
+- [ ] In `db.py`, expose one TinyDB opener plus the `users` table helper. The
+      hardware table belongs to Slice 2. Do not create repositories or a unit of
+      work.
 - [ ] In `app.py`, create the FastAPI app, mount static files, configure templates,
       register `/health`, and close TinyDB on shutdown.
 - [ ] Run `uv run ruff check .` and start the app with
@@ -198,18 +203,21 @@ uv run pytest tests/test_auth.py -q
       current active user, and enforce administrator role. Never cache a user in
       the cookie.
 - [ ] Implement login, logout, admin user list, and admin user creation with
-      redirect-after-POST and one generic visible login error.
+      `303` redirect-after-POST and one generic visible login error. Store no flash
+      messages or form state in the signed session.
 - [ ] Run the auth test until it passes. Confirm the application stores only
       `user_id` in the session mapping.
 
 ### Task 1.4 — Establish the visual language (55–68m)
 
-- [ ] Build one compact base layout with navigation, flash/error region, content
-      width, and logged-in identity.
-- [ ] Define plain-CSS tokens and shared styles for buttons, forms, tables, status
-      pills, issue pills, focus states, and a narrow-width stacked layout.
-- [ ] Style the login and user pages. Do not create a component library, animation
-      system, dark mode, or mockup phase.
+- [ ] Build one compact header with the wordmark, current identity, administrator
+      link when applicable, POST logout, error region, and content width. Do not
+      add a sidebar or future-feature navigation.
+- [ ] Define plain-CSS tokens and shared styles for buttons, forms, the user table,
+      focus states, and a narrow-width stacked layout. Status and issue components
+      belong to Slice 2.
+- [ ] Style the login, authenticated home, and user-management pages. Do not create
+      a component library, animation system, dark mode, or mockup phase.
 - [ ] Manually check the pages at desktop width and approximately 390px width.
 
 ### Task 1.5 — Add minimal CI and open PR 1 (68–80m)

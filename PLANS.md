@@ -12,6 +12,7 @@ The executable plan lives in
 
 ## Artifacts
 
+- [Slice 1 shell/auth specification](docs/superpowers/specs/2026-07-22-slice-1-shell-auth-design.md) — approved functional and visual contract for the first PR.
 - [Reference UI mockup](docs/assets/hardware-hub-reference-ui.png) — visual
   direction for Slice 1's shell and Slice 2's dashboard/admin screens. It is a
   styling and layout reference, not an expansion of the MVP feature scope.

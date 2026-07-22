@@ -191,15 +191,18 @@ rental.
 ## User Interface
 
 The visual foundation is defined in the first slice: a compact desktop-first
-layout, neutral palette, status badges, accessible forms, table styles, and a
-usable narrow-width layout. There is no separate mockup or design-system phase.
+layout, restrained brand palette, accessible forms, user-table styles, and a
+usable narrow-width layout. Status and issue badges begin in Slice 2. There is no
+separate mockup or design-system phase.
 
-The primary product design lands with the inventory slice:
+Slice 1 owns the branded login card, compact authenticated header, minimal signed-
+in page, and administrator user form. Slice 2 replaces the signed-in placeholder
+with the primary product experience:
 
-- login and navigation shell;
+- product navigation;
 - sortable/filterable hardware dashboard;
 - visible status, assignee, and data-issue indicators;
-- admin account and hardware forms;
+- hardware forms and administrator correction controls;
 - contextual rent/return controls;
 - grouped deterministic and AI audit findings.
 
