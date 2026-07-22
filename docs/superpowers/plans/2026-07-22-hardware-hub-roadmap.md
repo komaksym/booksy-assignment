@@ -272,7 +272,8 @@ tests/test_seed.py
 tests/test_inventory.py
 ```
 
-Modify `app.py`, `base.html`, and `app.css` only to register and display this slice.
+Modify `app.py`, `db.py`, `base.html`, and `app.css` only to register, store, and
+display this slice. Modify `pyproject.toml` only to package `data/*.json`.
 
 ### Exact seed fixture
 
@@ -362,11 +363,18 @@ Use this trigger/clear contract; do not invent stored resolution state:
 
 ### Task 2.2 — Implement atomic-enough import and pure findings
 
+- [ ] Use one persistent metadata marker so seed initialization runs once per
+      database rather than whenever the hardware table is empty. A present marker
+      is a no-op; an absent marker with existing hardware records is backfilled
+      without importing; an absent marker plus an empty table enters the import
+      path. This prevents deleted records from resurrecting after restart.
 - [ ] Load and validate that the fixture root is a list of 11 dictionaries before
-      opening the write path. Never key the list by source ID.
+      opening the import write path. Never key the list by source ID.
 - [ ] Build all canonical documents in memory using `deepcopy(raw)`, generated UUIDs,
-      and strict date/status conversion; then call TinyDB bulk insert once when the
-      hardware table is empty.
+      and strict date/status conversion; then call TinyDB bulk insert once and write
+      the marker only after it succeeds.
+- [ ] Include `data/*.json` in setuptools package data so installed builds contain
+      the fixture.
 - [ ] Implement a small immutable `Finding` dataclass or equivalent plain value in
       `rules.py`; do not introduce a validation framework.
 - [ ] Implement the eight rules exactly. An unresolved holder means canonical status

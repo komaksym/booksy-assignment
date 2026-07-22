@@ -96,11 +96,15 @@ the strict same-site cookie. These are explicit assessment shortcuts.
 
 ## Seed Import and Dirty-Data Behavior
 
-Import runs only when the hardware table is empty. The loader parses the complete
-JSON array before inserting anything. Every source object receives a new internal
-UUID, so the two records with source ID `4` do not collide. The complete original
-object is retained as a JSON value-equivalent deep copy; source whitespace and key
-ordering are not meaningful.
+Import runs once per database, tracked by a small persistent initialization marker.
+When the marker is absent, an empty hardware table receives the seed; a non-empty
+table is left untouched and marked initialized. The loader parses the complete JSON
+array before inserting anything and writes the marker only after the bulk insert.
+This prevents both duplicate startup imports and resurrection after an administrator
+deletes every row. Every source object receives a new internal UUID, so the two
+records with source ID `4` do not collide. The complete original object is retained
+as a JSON value-equivalent deep copy; source whitespace and key ordering are not
+meaningful.
 
 Only ISO `YYYY-MM-DD` dates and the three supported statuses populate canonical
 fields. Administrators edit canonical fields; the raw source remains an audit
@@ -201,10 +205,13 @@ with the primary product experience:
 
 - product navigation;
 - sortable/filterable hardware dashboard;
-- visible status, assignee, and data-issue indicators;
-- hardware forms and administrator correction controls;
-- contextual rent/return controls;
-- grouped deterministic and AI audit findings.
+- visible status and data-issue indicators;
+- hardware forms and administrator correction controls; and
+- inline deterministic findings for administrators.
+
+Slice 3 adds contextual rent/return controls and history. Slice 4 adds the grouped
+deterministic/AI audit page. Neither later-slice surface appears as a disabled,
+placeholder, or future link in Slice 2.
 
 For administrators, the inventory and edit screens also prove the import rather
 than merely claiming it: all eleven rows are visible; both source-ID `4` records
