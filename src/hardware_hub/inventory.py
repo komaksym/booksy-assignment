@@ -222,7 +222,7 @@ def update_hardware(
     internal_id: str,
     form: Mapping[str, object],
     *,
-    acting_user_id: str,
+    acting_user_id: str | None = None,
 ) -> dict[str, object] | None:
     """Re-read and atomically apply one validated administrator edit."""
 
@@ -245,10 +245,15 @@ def update_hardware(
     updated = deepcopy(current)
     updated.update(candidate)
     if is_release:
+        history = current.get("rental_history")
+        if not isinstance(history, list):
+            raise InventoryConflictError("Hardware rental history is invalid")
+        if not isinstance(acting_user_id, str) or not acting_user_id:
+            raise InventoryConflictError("Administrator identity is required to release hardware")
         occurred_at = datetime.now(UTC).isoformat()
         updated["holder_user_id"] = None
         updated["rental_history"] = [
-            *list(current.get("rental_history", [])),
+            *history,
             {
                 "type": "admin_release",
                 "user_id": acting_user_id,

@@ -192,11 +192,16 @@ def _hardware_form_context(
     """
 
     repair_action = None
+    delete_action = None
+    delete_reason = None
     if record is not None and record.get("holder_user_id") is None:
+        delete_action = "delete"
         if record.get("status") == "Available":
             repair_action = "mark-repair"
         elif record.get("status") == "Repair":
             repair_action = "clear-repair"
+    elif record is not None:
+        delete_reason = "This item cannot be deleted while it has a holder."
     return {
         "user": user,
         "record": record,
@@ -204,6 +209,8 @@ def _hardware_form_context(
         "error": error,
         "original_import": _original_import(record) if record is not None else [],
         "repair_action": repair_action,
+        "delete_action": delete_action,
+        "delete_reason": delete_reason,
     }
 
 
@@ -641,6 +648,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 acting_user_id=user["id"],
             )
         except (InventoryInputError, InventoryConflictError) as exc:
+            record = request.app.state.hardware.get(lambda item: item.get("id") == internal_id)
+            if record is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
             response_status = (
                 status.HTTP_409_CONFLICT
                 if isinstance(exc, InventoryConflictError)

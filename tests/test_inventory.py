@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from tinydb import Query
 
 from hardware_hub.auth import create_user
+from hardware_hub.inventory import InventoryConflictError, update_hardware
 from hardware_hub.rules import find_issues
 
 
@@ -173,6 +174,138 @@ def test_admin_release_history_has_semantic_label_target_and_no_raw_uuid(
     assert "Administrator release to Repair" in response.text
     assert administrator["email"] in response.text
     assert administrator["id"] not in response.text
+
+
+def test_admin_release_rejects_malformed_rental_history_without_writing(
+    client, app: FastAPI
+) -> None:
+    hardware = app.state.hardware
+    source_one = hardware.get(Query().source_id == 1)
+    assert source_one is not None
+    malformed = deepcopy(source_one)
+    malformed.update({"status": "In Use", "holder_user_id": "holder-id", "rental_history": {}})
+    hardware.update(malformed, Query().id == source_one["id"])
+    before = hardware.get(Query().id == source_one["id"])
+    assert before is not None
+
+    with pytest.raises(InventoryConflictError, match="rental history is invalid"):
+        update_hardware(
+            hardware,
+            str(source_one["id"]),
+            _edit_form(before, status="Available"),
+            acting_user_id="admin-id",
+        )
+
+    assert hardware.get(Query().id == source_one["id"]) == before
+
+
+def test_update_hardware_keeps_legacy_normal_edit_call_shape(client, app: FastAPI) -> None:
+    hardware = app.state.hardware
+    source_one = hardware.get(Query().source_id == 1)
+    assert source_one is not None
+
+    updated = update_hardware(
+        hardware,
+        str(source_one["id"]),
+        _edit_form(source_one, status="Keep current", name="Compatible edit"),
+    )
+
+    assert updated is not None
+    assert updated["name"] == "Compatible edit"
+
+
+def test_admin_release_requires_an_actor_without_writing(client, app: FastAPI) -> None:
+    hardware = app.state.hardware
+    source_one = hardware.get(Query().source_id == 1)
+    assert source_one is not None
+    held = deepcopy(source_one)
+    held.update({"status": "In Use", "holder_user_id": "holder-id"})
+    hardware.update(held, Query().id == source_one["id"])
+    before = hardware.get(Query().id == source_one["id"])
+    assert before is not None
+
+    with pytest.raises(InventoryConflictError, match="Administrator identity is required"):
+        update_hardware(hardware, str(source_one["id"]), _edit_form(before, status="Available"))
+
+    assert hardware.get(Query().id == source_one["id"]) == before
+
+
+def test_admin_edit_error_renders_the_current_record_after_service_failure(
+    client, app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hardware_hub.app as app_module
+
+    hardware = app.state.hardware
+    source_one = hardware.get(Query().source_id == 1)
+    assert source_one is not None
+    _login(client, "admin@booksy.test", "admin-password")
+
+    def fail_after_concurrent_change(*args, **kwargs):
+        current = hardware.get(Query().id == source_one["id"])
+        assert current is not None
+        current["status"] = "In Use"
+        current["holder_user_id"] = "another-user"
+        hardware.update(current, Query().id == source_one["id"])
+        raise InventoryConflictError("Status cannot change while hardware has a holder")
+
+    monkeypatch.setattr(app_module, "update_hardware", fail_after_concurrent_change)
+    response = client.post(
+        f"/admin/hardware/{source_one['id']}/edit",
+        data=_edit_form(source_one, status="Repair"),
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 409
+    assert "Current: In Use" in response.text
+    assert f'action="/admin/hardware/{source_one["id"]}/delete"' not in response.text
+    assert "This item cannot be deleted while it has a holder." in response.text
+
+
+def test_admin_edit_error_returns_not_found_if_record_disappears_during_service_failure(
+    client, app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hardware_hub.app as app_module
+
+    hardware = app.state.hardware
+    source_one = hardware.get(Query().source_id == 1)
+    assert source_one is not None
+    _login(client, "admin@booksy.test", "admin-password")
+
+    def fail_after_concurrent_delete(*args, **kwargs):
+        hardware.remove(Query().id == source_one["id"])
+        raise InventoryConflictError("Status cannot change while hardware has a holder")
+
+    monkeypatch.setattr(app_module, "update_hardware", fail_after_concurrent_delete)
+    response = client.post(
+        f"/admin/hardware/{source_one['id']}/edit",
+        data=_edit_form(source_one, status="Repair"),
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 404
+
+
+def test_delete_context_is_derived_in_python() -> None:
+    from hardware_hub.app import _hardware_form_context
+
+    user = {"id": "admin-id", "role": "admin"}
+    held = _hardware_form_context(
+        user=user,
+        record={"id": "hardware-id", "holder_user_id": "holder-id", "status": "In Use"},
+        values={},
+        error=None,
+    )
+    available = _hardware_form_context(
+        user=user,
+        record={"id": "hardware-id", "holder_user_id": None, "status": "Available"},
+        values={},
+        error=None,
+    )
+
+    assert held["delete_action"] is None
+    assert held["delete_reason"] == "This item cannot be deleted while it has a holder."
+    assert available["delete_action"] == "delete"
+    assert available["delete_reason"] is None
 
 
 def test_admin_inventory_writes_preserve_raw_evidence(client, app: FastAPI) -> None:

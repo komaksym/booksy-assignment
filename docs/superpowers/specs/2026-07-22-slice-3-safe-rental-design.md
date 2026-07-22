@@ -222,8 +222,11 @@ rental_history    -> prior events plus one admin_release event
 updated_at        -> event timestamp
 ```
 
-All other hardware fields, including `raw_payload`, `source_id`, canonical
-metadata, notes, and legacy history, retain their freshly read values.
+Rent and return retain all other freshly read hardware fields, including
+`raw_payload`, `source_id`, canonical metadata, notes, and legacy history. An
+administrator release instead applies the validated submitted canonical metadata,
+notes, and legacy history while retaining immutable provenance and appending the
+existing rental history.
 
 ## Event Schema and Ordering
 
