@@ -1,0 +1,63 @@
+<div class="table-scroll inventory-table" tabindex="0">
+  <table>
+    <thead>
+      <tr>
+        {% if user.role == "admin" %}<th>Source ID</th>{% endif %}
+        <th>Name</th>
+        <th>Brand</th>
+        <th>Purchase date</th>
+        <th>Status</th>
+        {% if user.role == "admin" %}
+          <th>Findings</th>
+          <th>Actions</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for hardware in records %}
+        <tr>
+          {% if user.role == "admin" %}
+            <td>{{ hardware.source_id if hardware.source_id is not none else "Manual" }}</td>
+          {% endif %}
+          <td class="hardware-name">{{ hardware.name }}</td>
+          <td>{{ hardware.brand if hardware.brand is not none else "—" }}</td>
+          <td>{{ hardware.purchase_date if hardware.purchase_date is not none else "—" }}</td>
+          <td>
+            <span class="status-badge status-{{ hardware.status | lower | replace(' ', '-') if hardware.status else 'correction' }}">
+              {{ hardware.status if hardware.status is not none else "Needs correction" }}
+            </span>
+          </td>
+          {% if user.role == "admin" %}
+            <td>
+              <div class="finding-list">
+                {% for finding in hardware.findings %}
+                  <span class="finding-badge finding-{{ finding.severity }}">
+                    {{ finding.code | replace("_", " ") | title }}
+                  </span>
+                {% else %}
+                  <span class="muted">None</span>
+                {% endfor %}
+              </div>
+            </td>
+            <td>
+              <div class="row-actions">
+                <a class="button button-small button-outline" href="/admin/hardware/{{ hardware.id }}/edit">Edit</a>
+                {% if hardware.repair_action %}
+                  <form method="post" action="/admin/hardware/{{ hardware.id }}/{{ hardware.repair_action }}">
+                    <button class="button button-small button-quiet-dark" type="submit">
+                      {{ "Mark repair" if hardware.repair_action == "mark-repair" else "Clear repair" }}
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr>
+          <td colspan="{{ 7 if user.role == 'admin' else 4 }}" class="empty-state">No hardware matches these filters.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

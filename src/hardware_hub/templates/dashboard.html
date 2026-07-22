@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Inventory · Hardware Hub{% endblock %}
+{% block content %}
+  <header class="page-heading dashboard-heading">
+    <div>
+      <p class="eyebrow">Inventory</p>
+      <h1>Hardware inventory</h1>
+      {% if user.role == "admin" %}
+        <p class="muted">{{ source_count }} of {{ original_source_count }} source records present</p>
+      {% endif %}
+    </div>
+    {% if user.role == "admin" %}
+      <a class="button button-primary" href="/admin/hardware/new">Add hardware</a>
+    {% endif %}
+  </header>
+
+  {% if error %}
+    <p class="alert dashboard-alert" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <form class="filter-form card" method="get" action="/">
+    <label>
+      <span>Name</span>
+      <input type="search" name="name" value="{{ filters.name }}" placeholder="Search names">
+    </label>
+    <label>
+      <span>Brand</span>
+      <select name="brand">
+        <option value="">All brands</option>
+        {% if filters.brand and filters.brand not in brands %}
+          <option value="{{ filters.brand }}" selected>{{ filters.brand }}</option>
+        {% endif %}
+        {% for brand in brands %}
+          <option value="{{ brand }}"{% if filters.brand == brand %} selected{% endif %}>{{ brand }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Purchase date</span>
+      <input type="text" name="purchase_date" value="{{ filters.purchase_date }}" placeholder="YYYY-MM-DD">
+    </label>
+    <label>
+      <span>Status</span>
+      <select name="status">
+        <option value="">All statuses</option>
+        {% set statuses = ["Available", "In Use", "Repair", "Needs correction"] %}
+        {% if filters.status and filters.status not in statuses %}
+          <option value="{{ filters.status }}" selected>{{ filters.status }}</option>
+        {% endif %}
+        {% for status in statuses %}
+          <option value="{{ status }}"{% if filters.status == status %} selected{% endif %}>{{ status }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Sort by</span>
+      <select name="sort">
+        {% set sorts = {"name": "Name", "brand": "Brand", "purchase_date": "Purchase date", "status": "Status"} %}
+        {% if filters.sort not in sorts %}
+          <option value="{{ filters.sort }}" selected>{{ filters.sort }}</option>
+        {% endif %}
+        {% for value, label in sorts.items() %}
+          <option value="{{ value }}"{% if filters.sort == value %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Direction</span>
+      <select name="direction">
+        {% if filters.direction not in ["asc", "desc"] %}
+          <option value="{{ filters.direction }}" selected>{{ filters.direction }}</option>
+        {% endif %}
+        <option value="asc"{% if filters.direction == "asc" %} selected{% endif %}>Ascending</option>
+        <option value="desc"{% if filters.direction == "desc" %} selected{% endif %}>Descending</option>
+      </select>
+    </label>
+    <button class="button button-primary" type="submit">Apply</button>
+  </form>
+
+  {% if user.role == "admin" %}
+    <p class="finding-summary">{{ finding_count }} findings across {{ rule_count }} rules</p>
+  {% endif %}
+
+  <section class="card inventory-card" aria-label="Hardware records">
+    {% include "_hardware_table.html" %}
+  </section>
+{% endblock %}

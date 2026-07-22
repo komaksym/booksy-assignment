@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit hardware" if record else "Add hardware" }} · Hardware Hub{% endblock %}
+{% block content %}
+  <header class="page-heading form-heading">
+    <div>
+      <p class="eyebrow">Inventory administration</p>
+      <h1>{{ "Edit hardware" if record else "Add hardware" }}</h1>
+      {% if record %}<p class="muted">Internal ID {{ record.id }}</p>{% endif %}
+    </div>
+    <a class="button button-outline" href="/">Back to inventory</a>
+  </header>
+
+  {% if error %}
+    <p class="alert" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <div class="hardware-form-grid{% if not record %} create-only{% endif %}">
+    {% if record %}
+      <section class="card evidence-card" aria-labelledby="original-import-title">
+        <h2 id="original-import-title">Original import</h2>
+        {% if original_import %}
+          <dl class="evidence-list">
+            {% for field in original_import %}
+              <div>
+                <dt>{{ field.label }}</dt>
+                <dd>{{ field.value }}</dd>
+              </div>
+            {% endfor %}
+          </dl>
+        {% else %}
+          <p class="muted">This hardware was created in the application.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    <section class="card hardware-form-card" aria-labelledby="application-values-title">
+      <h2 id="application-values-title">Application values</h2>
+      <form class="form-stack" method="post" action="{{ '/admin/hardware/' ~ record.id ~ '/edit' if record else '/admin/hardware' }}">
+        <label>
+          <span>Name</span>
+          <input type="text" name="name" value="{{ values.name }}" required>
+        </label>
+        <label>
+          <span>Brand</span>
+          <input type="text" name="brand" value="{{ values.brand }}">
+        </label>
+        <label>
+          <span>Purchase date</span>
+          <input type="text" name="purchase_date" value="{{ values.purchase_date }}" placeholder="YYYY-MM-DD">
+        </label>
+        <label>
+          <span>Status</span>
+          <select name="status">
+            {% set choices = ["Keep current", "Available", "Repair"] if record else ["Available", "Repair"] %}
+            {% if values.status not in choices %}
+              <option value="{{ values.status }}" selected>{{ values.status }}</option>
+            {% endif %}
+            {% for choice in choices %}
+              <option value="{{ choice }}"{% if values.status == choice %} selected{% endif %}>{{ choice }}</option>
+            {% endfor %}
+          </select>
+          {% if record %}<small>Current: {{ record.status if record.status is not none else "Needs correction" }}</small>{% endif %}
+        </label>
+        <label>
+          <span>Notes</span>
+          <textarea name="notes" rows="5">{{ values.notes }}</textarea>
+        </label>
+        <label>
+          <span>Legacy history</span>
+          <textarea name="legacy_history" rows="5">{{ values.legacy_history }}</textarea>
+        </label>
+        <button class="button button-primary" type="submit">{{ "Save changes" if record else "Add hardware" }}</button>
+      </form>
+
+      {% if record %}
+        <div class="destructive-actions">
+          {% if repair_action %}
+            <form method="post" action="/admin/hardware/{{ record.id }}/{{ repair_action }}">
+              <button class="button button-outline" type="submit">
+                {{ "Mark repair" if repair_action == "mark-repair" else "Clear repair" }}
+              </button>
+            </form>
+          {% endif %}
+          <form method="post" action="/admin/hardware/{{ record.id }}/delete">
+            <button class="button button-danger" type="submit">Delete hardware</button>
+          </form>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}
