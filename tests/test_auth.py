@@ -10,7 +10,7 @@ from itsdangerous import TimestampSigner
 from hardware_hub.config import Settings
 from hardware_hub.db import users_table
 
-_SESSION_IDLE_TIMEOUT_SECONDS = 8 * 60 * 60
+_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
 
 
 def session_payload(client: TestClient, settings: Settings) -> dict[str, str]:
@@ -18,7 +18,7 @@ def session_payload(client: TestClient, settings: Settings) -> dict[str, str]:
     assert cookie is not None
     signed = TimestampSigner(settings.session_secret).unsign(
         cookie,
-        max_age=_SESSION_IDLE_TIMEOUT_SECONDS,
+        max_age=_SESSION_MAX_AGE_SECONDS,
     )
     return json.loads(b64decode(signed))
 
@@ -39,14 +39,14 @@ def test_admin_creates_user_and_signed_session_enforces_roles(
 
     assert response.status_code == 303
     assert response.headers["location"] == "/admin/users"
-    assert f"Max-Age={_SESSION_IDLE_TIMEOUT_SECONDS}" in response.headers["set-cookie"]
+    assert f"Max-Age={_SESSION_MAX_AGE_SECONDS}" in response.headers["set-cookie"]
     assert set(session_payload(client, settings)) == {"user_id"}
     admin_user_id = session_payload(client, settings)["user_id"]
 
     response = client.get("/admin/users")
 
     assert response.status_code == 200
-    assert f"Max-Age={_SESSION_IDLE_TIMEOUT_SECONDS}" in response.headers["set-cookie"]
+    assert "set-cookie" not in response.headers
 
     response = client.post(
         "/login",
