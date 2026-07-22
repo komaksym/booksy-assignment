@@ -18,7 +18,8 @@ from hardware_hub.auth import (
     current_user,
 )
 from hardware_hub.config import Settings
-from hardware_hub.db import open_db, users_table
+from hardware_hub.db import hardware_table, metadata_table, open_db, users_table
+from hardware_hub.inventory import import_seed
 
 _PACKAGE_DIR = Path(__file__).parent
 _TEMPLATES = Jinja2Templates(directory=_PACKAGE_DIR / "templates")
@@ -37,12 +38,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db = open_db(runtime.tinydb_path)
         app.state.db = db
         app.state.users = users_table(db)
+        app.state.hardware = hardware_table(db)
+        app.state.metadata = metadata_table(db)
         try:
             bootstrap_admin(
                 app.state.users,
                 runtime.bootstrap_admin_email,
                 runtime.bootstrap_admin_password,
             )
+            import_seed(app.state.hardware, app.state.metadata)
             yield
         finally:
             db.close()
