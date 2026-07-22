@@ -123,3 +123,39 @@ states are not normalized, deletion remains server-side rejected while held, and
 edit page omits the active Delete POST form until the item is released. History uses
 the existing privacy policy: administrators see a resolved actor email, ordinary
 users see role-safe labels, and no page exposes a raw UUID.
+
+## Slice 4 — deterministic and DeepSeek audit
+
+The Slice 4 implementation keeps one explicit authority boundary: `find_issues`
+produces the fresh deterministic findings that govern rental safety, while DeepSeek is
+an optional read-only second opinion. The model has no tools or write route, and its
+severity labels are presentation metadata only. Missing configuration, provider
+failure, malformed JSON, schema errors, incomplete completions, and unknown hardware
+IDs all preserve the complete deterministic result and leave every stored hardware
+document unchanged.
+
+The model receives one allowlisted snapshot containing all current hardware records,
+including canonical-null rows. It includes canonical fields, editable notes and legacy
+history, a boolean legacy-assignee-presence signal, and deterministic finding
+code/severity pairs. It excludes raw payloads, source IDs, application users, emails,
+credentials, session data, holders, rental history, and timestamps. Free text is
+included deliberately because interpreting it is the feature, while the prompt marks
+all snapshot values as untrusted data.
+
+The implementation began with failing access, fallback, privacy, valid-response,
+atomic-rejection, and non-mutation tests. A one-time remote runner then applied the
+production code and required locked dependencies, Ruff formatting and linting, the
+full pytest suite, a package build, and a clean diff before preserving the result.
+The normal pull-request CI subsequently passed on the exact code-review head.
+
+Independent follow-up review found that an unexpected provider envelope such as
+`{"choices": [null]}` could raise `AttributeError` before reaching the safe fallback.
+The parser now treats object-shape errors as invalid provider responses, and focused
+regressions cover both that envelope and a non-`stop` completion. No remaining Critical
+or Important code issue was found after the correction.
+
+The repository now contains the one-worker Railway configuration and the documented
+`/data` persistence contract, but no public deployment, funded real-provider result,
+new browser screenshot, or redeploy-persistence result is claimed. Those checks remain
+blocked on the user-controlled Railway project, mounted volume, provider key, and
+sealed production secrets.
