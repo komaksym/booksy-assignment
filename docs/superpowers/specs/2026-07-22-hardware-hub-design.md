@@ -40,10 +40,10 @@ flowchart LR
     Web --> Audit["Audit service"]
     Auth --> Store["TinyDB repository"]
     Inventory --> Store
+    Store -->|"inventory snapshot"| Audit
     Audit --> Rules["Deterministic rules"]
     Audit --> LLM["LLM adapter"]
-    Rules --> Store
-    LLM --> Audit
+    LLM -->|"validated findings"| Audit
 ```
 
 Route handlers remain thin. Authentication, inventory transitions, validation,
@@ -59,8 +59,9 @@ therefore makes its operating boundary explicit:
 - one Railway replica;
 - one Uvicorn worker;
 - one process-wide asynchronous mutation lock;
-- every rent, return, repair, create, update, and archive operation re-reads and
-  validates current state while holding that lock;
+- every TinyDB mutation, including bootstrap, user, session, rent, return,
+  repair, create, update, archive, and seed writes, holds that lock; stateful
+  domain operations also re-read and validate current state while holding it;
 - all changes to a hardware record and its embedded history are written as one
   repository operation.
 
@@ -86,6 +87,7 @@ TinyDB itself is schema-less.
 
 - SHA-256 hash of a cryptographically random token;
 - user ID;
+- random session-bound synchronizer CSRF token;
 - creation and expiration timestamps.
 
 ### Hardware
@@ -201,6 +203,9 @@ invalid severities, and malformed output.
 The snapshot contains hardware data only. User records, session data,
 credentials, and secrets are never included; assignment consistency is conveyed
 as an anonymous present-or-missing signal rather than an employee identity.
+Before notes or legacy history leave the process, email addresses and common
+credential/token patterns are redacted. The outbound DTO never serializes the
+raw source payload.
 
 The adapter targets an OpenAI-compatible HTTP API configured through
 `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`. The deployed demo configures all
@@ -232,11 +237,16 @@ configuration includes:
 
 - one replica and one Uvicorn worker;
 - a persistent volume mounted at `/data`;
+- `ENVIRONMENT=production` so the persistent-path guard is active;
 - `TINYDB_PATH=/data/hardware-hub.json`;
 - `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` stored only as Railway
   secrets;
 - `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` stored only as Railway secrets;
 - a health endpoint that does not expose configuration or inventory data.
+
+Startup fails closed if Railway runtime markers are present while
+`ENVIRONMENT` is not `production`, or if the resolved TinyDB path escapes the
+mounted volume.
 
 The free allowance is acceptable for assessment traffic but is not treated as
 a production availability guarantee.
