@@ -26,7 +26,7 @@ The executable plan lives in
 | --- | --- | --- | --- |
 | 1 | `codex/01-shell-auth` | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | Merged |
 | 2 | `codex/02-dirty-inventory` | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Merged |
-| 3 | `codex/03-rental` | Guarded rent/return flow with ownership and visible history | Review fixes implemented; final validation |
+| 3 | `codex/03-rental` | Guarded rent/return flow with ownership and visible history | PR ready |
 | 4 | `codex/04-audit-release` | Deterministic/LLM audit, honest documentation, manual smoke verification, and Railway-ready configuration | Blocked on Slice 3 merge |
 
 No implementation duration, estimate, or timebox is part of this roadmap. Agents
