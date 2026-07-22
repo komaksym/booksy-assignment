@@ -9,8 +9,8 @@
         <th>Status</th>
         {% if user.role == "admin" %}
           <th>Findings</th>
-          <th>Actions</th>
         {% endif %}
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -19,7 +19,7 @@
           {% if user.role == "admin" %}
             <td>{{ hardware.source_id if hardware.source_id is not none else "Manual" }}</td>
           {% endif %}
-          <td class="hardware-name">{{ hardware.name }}</td>
+          <td class="hardware-name"><a href="/hardware/{{ hardware.id }}">{{ hardware.name }}</a></td>
           <td>{{ hardware.brand if hardware.brand is not none else "—" }}</td>
           <td>{{ hardware.purchase_date if hardware.purchase_date is not none else "—" }}</td>
           <td>
@@ -39,7 +39,9 @@
                 {% endfor %}
               </div>
             </td>
-            <td>
+          {% endif %}
+          <td>
+            {% if user.role == "admin" %}
               <div class="row-actions">
                 <a class="button button-small button-outline" href="/admin/hardware/{{ hardware.id }}/edit">Edit</a>
                 {% if hardware.repair_action %}
@@ -50,12 +52,18 @@
                   </form>
                 {% endif %}
               </div>
-            </td>
-          {% endif %}
+            {% elif hardware.rental_action %}
+              <form method="post" action="/hardware/{{ hardware.id }}/{{ hardware.rental_action }}">
+                <button class="button button-small button-primary" type="submit">{{ hardware.rental_action | title }}</button>
+              </form>
+            {% else %}
+              <span class="disabled-reason">{{ hardware.rental_reason }}</span>
+            {% endif %}
+          </td>
         </tr>
       {% else %}
         <tr>
-          <td colspan="{{ 7 if user.role == 'admin' else 4 }}" class="empty-state">No hardware matches these filters.</td>
+          <td colspan="{{ 7 if user.role == 'admin' else 5 }}" class="empty-state">No hardware matches these filters.</td>
         </tr>
       {% endfor %}
     </tbody>

@@ -221,8 +221,10 @@ def update_hardware(
     hardware: Table,
     internal_id: str,
     form: Mapping[str, object],
+    *,
+    acting_user_id: str | None = None,
 ) -> dict[str, object] | None:
-    """Re-read and update one internal-ID document after full validation."""
+    """Re-read and atomically apply one validated administrator edit."""
 
     query = Query()
     current = hardware.get(query.id == internal_id)
@@ -233,11 +235,37 @@ def update_hardware(
         current_status=current.get("status"),
         creating=False,
     )
-    if current.get("holder_user_id") is not None and candidate["status"] != current.get("status"):
+    held = current.get("holder_user_id") is not None
+    is_release = (
+        held and current.get("status") == "In Use" and candidate["status"] in _MANUAL_STATUSES
+    )
+    if held and candidate["status"] != current.get("status") and not is_release:
         raise InventoryConflictError("Status cannot change while hardware has a holder")
-    candidate["updated_at"] = datetime.now(UTC).isoformat()
-    hardware.update(candidate, query.id == internal_id)
-    return hardware.get(query.id == internal_id)
+
+    updated = deepcopy(current)
+    updated.update(candidate)
+    if is_release:
+        history = current.get("rental_history")
+        if not isinstance(history, list):
+            raise InventoryConflictError("Hardware rental history is invalid")
+        if not isinstance(acting_user_id, str) or not acting_user_id:
+            raise InventoryConflictError("Administrator identity is required to release hardware")
+        occurred_at = datetime.now(UTC).isoformat()
+        updated["holder_user_id"] = None
+        updated["rental_history"] = [
+            *history,
+            {
+                "type": "admin_release",
+                "user_id": acting_user_id,
+                "target_status": candidate["status"],
+                "occurred_at": occurred_at,
+            },
+        ]
+        updated["updated_at"] = occurred_at
+    else:
+        updated["updated_at"] = datetime.now(UTC).isoformat()
+    hardware.update(updated, query.id == internal_id)
+    return updated
 
 
 def delete_hardware(hardware: Table, internal_id: str) -> bool:

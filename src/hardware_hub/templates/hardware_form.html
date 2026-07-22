@@ -81,9 +81,13 @@
               </button>
             </form>
           {% endif %}
-          <form method="post" action="/admin/hardware/{{ record.id }}/delete">
-            <button class="button button-danger" type="submit">Delete hardware</button>
-          </form>
+          {% if delete_action %}
+            <form method="post" action="/admin/hardware/{{ record.id }}/delete">
+              <button class="button button-danger" type="submit">Delete hardware</button>
+            </form>
+          {% elif delete_reason %}
+            <p class="muted">{{ delete_reason }}</p>
+          {% endif %}
         </div>
       {% endif %}
     </section>

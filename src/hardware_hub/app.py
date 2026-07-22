@@ -31,52 +31,79 @@ from hardware_hub.inventory import (
     transition_repair,
     update_hardware,
 )
+from hardware_hub.rental import (
+    RentalConflictError,
+    RentalPermissionError,
+    rent_hardware,
+    return_hardware,
+)
 from hardware_hub.rules import Finding, find_issues
 
 _PACKAGE_DIR = Path(__file__).parent
 _TEMPLATES = Jinja2Templates(directory=_PACKAGE_DIR / "templates")
 _SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
 _ORIGINAL_SOURCE_COUNT = 11
+_ORDINARY_STATUS_CHOICES = ("Available", "In Use", "Repair")
+_ADMIN_STATUS_CHOICES = (*_ORDINARY_STATUS_CHOICES, "Needs correction")
+
+
+def _status_choices(user: dict[str, Any]) -> tuple[str, ...]:
+    """Return the dashboard status filters available to the current role."""
+
+    return _ADMIN_STATUS_CHOICES if user["role"] == "admin" else _ORDINARY_STATUS_CHOICES
+
+
+def _dashboard_record(record: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    """Project one stored record to the fields rendered by its dashboard role."""
+
+    fields = ["id", "name", "brand", "purchase_date", "status"]
+    if user["role"] == "admin":
+        fields.insert(1, "source_id")
+    return {field: record.get(field) for field in fields}
 
 
 def _dashboard_context(
     *,
     user: dict[str, Any],
     all_records: list[dict[str, Any]],
+    visible_records: list[dict[str, Any]],
     records: list[dict[str, Any]],
     filters: dict[str, str],
     error: str | None,
 ) -> dict[str, Any]:
     """Build template-ready dashboard state without mutating stored hardware.
 
-    ``all_records`` drives global brands and administrator finding totals, while
-    ``records`` is the already filtered and sorted subset rendered in the table.
-    Each table row is copied before presentation-only findings and repair actions
-    are attached.
+    ``all_records`` drives circulation decisions, ``visible_records`` supplies
+    role-safe filter choices, and ``records`` is the filtered/sorted table subset.
+    Each table row is copied before presentation-only state is attached.
     """
 
-    findings = find_issues(all_records, date.today()) if user["role"] == "admin" else ()
+    findings = find_issues(all_records, date.today())
     by_hardware: dict[str, list[Finding]] = {}
     for finding in findings:
         by_hardware.setdefault(finding.hardware_id, []).append(finding)
 
     rows = []
     for record in records:
-        row = dict(record)
-        row["findings"] = by_hardware.get(str(record["id"]), [])
-        row["repair_action"] = (
-            "mark-repair"
-            if record.get("holder_user_id") is None and record.get("status") == "Available"
-            else "clear-repair"
-            if record.get("holder_user_id") is None and record.get("status") == "Repair"
-            else None
-        )
+        row = _dashboard_record(record, user)
+        record_findings = by_hardware.get(str(record["id"]), [])
+        if user["role"] == "admin":
+            row["findings"] = record_findings
+            row["repair_action"] = (
+                "mark-repair"
+                if record.get("holder_user_id") is None and record.get("status") == "Available"
+                else "clear-repair"
+                if record.get("holder_user_id") is None and record.get("status") == "Repair"
+                else None
+            )
+        else:
+            row.update(_circulation_action(record, user, record_findings))
         rows.append(row)
 
     brands = sorted(
         {
             str(record["brand"])
-            for record in all_records
+            for record in visible_records
             if isinstance(record.get("brand"), str) and record["brand"]
         },
         key=str.casefold,
@@ -86,6 +113,7 @@ def _dashboard_context(
         "records": rows,
         "filters": filters,
         "brands": brands,
+        "status_choices": _status_choices(user),
         "error": error,
         "source_count": sum(record.get("source_id") is not None for record in all_records),
         "original_source_count": _ORIGINAL_SOURCE_COUNT,
@@ -173,11 +201,16 @@ def _hardware_form_context(
     """
 
     repair_action = None
+    delete_action = None
+    delete_reason = None
     if record is not None and record.get("holder_user_id") is None:
+        delete_action = "delete"
         if record.get("status") == "Available":
             repair_action = "mark-repair"
         elif record.get("status") == "Repair":
             repair_action = "clear-repair"
+    elif record is not None:
+        delete_reason = "This item cannot be deleted while it has a holder."
     return {
         "user": user,
         "record": record,
@@ -185,7 +218,133 @@ def _hardware_form_context(
         "error": error,
         "original_import": _original_import(record) if record is not None else [],
         "repair_action": repair_action,
+        "delete_action": delete_action,
+        "delete_reason": delete_reason,
     }
+
+
+def _visible_hardware(hardware: Any, user: dict[str, Any], internal_id: str) -> dict[str, Any]:
+    """Load one item by internal ID, concealing invalid canonical state from users."""
+
+    record = hardware.get(lambda item: item.get("id") == internal_id)
+    if record is None or (user["role"] != "admin" and record.get("status") is None):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return record
+
+
+def _circulation_action(
+    record: dict[str, Any], user: dict[str, Any], record_findings: list[Finding]
+) -> dict[str, str | None]:
+    """Return the safe, presentation-only circulation action or reason for one item."""
+
+    if user["role"] == "admin":
+        return {"rental_action": None, "rental_reason": None}
+    if record.get("status") == "Available" and record.get("holder_user_id") is None:
+        if any(finding.severity == "critical" for finding in record_findings):
+            return {"rental_action": None, "rental_reason": "Blocked by safety check"}
+        return {"rental_action": "rent", "rental_reason": None}
+    if record.get("status") == "In Use" and record.get("holder_user_id") == user["id"]:
+        return {"rental_action": "return", "rental_reason": None}
+    if record.get("status") == "In Use" and record.get("holder_user_id") is not None:
+        return {"rental_action": None, "rental_reason": "Currently rented"}
+    if record.get("status") == "Repair":
+        return {"rental_action": None, "rental_reason": "Under repair"}
+    return {"rental_action": None, "rental_reason": "Unavailable"}
+
+
+def _rental_history_context(
+    record: dict[str, Any], user: dict[str, Any], users_by_id: dict[str, dict[str, Any]]
+) -> list[dict[str, str]]:
+    """Build newest-first, privacy-resolved rental activity for one detail page."""
+
+    history = record.get("rental_history", [])
+    if not isinstance(history, list):
+        return []
+    entries = []
+    for event in reversed(history):
+        if not isinstance(event, dict):
+            continue
+        actor = (
+            users_by_id.get(str(event.get("user_id")), {}).get("email", "Unknown user")
+            if user["role"] == "admin"
+            else "You"
+            if event.get("user_id") == user["id"]
+            else "Another user"
+        )
+        event_type = event.get("type")
+        label = (
+            f"Administrator release to {event.get('target_status', 'Unknown')}"
+            if event_type == "admin_release"
+            else "Rent"
+            if event_type == "rent"
+            else "Return"
+        )
+        entries.append(
+            {
+                "label": label,
+                "actor": str(actor),
+                "occurred_at": str(event.get("occurred_at", "")),
+            }
+        )
+    return entries
+
+
+def _hardware_detail_context(
+    *,
+    user: dict[str, Any],
+    record: dict[str, Any],
+    all_records: list[dict[str, Any]],
+    users: list[dict[str, Any]],
+    error: str | None,
+) -> dict[str, Any]:
+    """Build privacy-aware display state for the canonical hardware detail page."""
+
+    findings = find_issues(all_records, date.today())
+    record_findings = [finding for finding in findings if finding.hardware_id == record["id"]]
+    display_record = {
+        key: record.get(key) for key in ("id", "name", "brand", "purchase_date", "status")
+    }
+    users_by_id = {
+        str(candidate["id"]): candidate
+        for candidate in users
+        if isinstance(candidate.get("id"), str)
+    }
+    circulation = _circulation_action(record, user, record_findings)
+    return {
+        "user": user,
+        "record": display_record,
+        "rental_action": circulation["rental_action"],
+        "rental_reason": circulation["rental_reason"],
+        "rental_history": _rental_history_context(record, user, users_by_id),
+        "findings": record_findings if user["role"] == "admin" else [],
+        "original_import": _original_import(record) if user["role"] == "admin" else [],
+        "error": error,
+    }
+
+
+def _detail_response(
+    request: Request,
+    user: dict[str, Any],
+    internal_id: str,
+    *,
+    error: str | None = None,
+    status_code: int = status.HTTP_200_OK,
+) -> HTMLResponse:
+    """Render a fresh canonical hardware detail response."""
+
+    record = _visible_hardware(request.app.state.hardware, user, internal_id)
+    return _TEMPLATES.TemplateResponse(
+        request=request,
+        name="hardware_detail.html",
+        context=_hardware_detail_context(
+            user=user,
+            record=record,
+            all_records=request.app.state.hardware.all(),
+            users=request.app.state.users.all(),
+            error=error,
+        ),
+        status_code=status_code,
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -289,6 +448,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         error = None
         response_status = status.HTTP_200_OK
         try:
+            if status_filter and status_filter not in _status_choices(user):
+                raise InventoryInputError("Choose a supported status filter")
             records = filter_and_sort(visible, **filters)
         except InventoryInputError as exc:
             error = str(exc)
@@ -299,7 +460,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             name="dashboard.html",
             context=_dashboard_context(
                 user=user,
-                all_records=all_records if user["role"] == "admin" else visible,
+                all_records=all_records,
+                visible_records=visible,
                 records=records,
                 filters=filters,
                 error=error,
@@ -314,6 +476,60 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
         request.session.clear()
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.get("/hardware/{internal_id}", response_class=HTMLResponse)
+    async def hardware_detail(request: Request, internal_id: str):
+        user = current_user(request)
+        if user is None:
+            return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+        return _detail_response(request, user, internal_id)
+
+    async def rental_transition(request: Request, internal_id: str, *, action: str):
+        user = current_user(request)
+        if user is None:
+            return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+        _visible_hardware(request.app.state.hardware, user, internal_id)
+        if user["role"] != "user":
+            return _detail_response(
+                request,
+                user,
+                internal_id,
+                error="Administrators cannot rent or return hardware.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            updated = (
+                rent_hardware(request.app.state.hardware, internal_id, user["id"])
+                if action == "rent"
+                else return_hardware(request.app.state.hardware, internal_id, user["id"])
+            )
+        except RentalConflictError as exc:
+            return _detail_response(
+                request,
+                user,
+                internal_id,
+                error=str(exc),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        except RentalPermissionError as exc:
+            return _detail_response(
+                request,
+                user,
+                internal_id,
+                error=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        if updated is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        return RedirectResponse(f"/hardware/{internal_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.post("/hardware/{internal_id}/rent")
+    async def rent(request: Request, internal_id: str):
+        return await rental_transition(request, internal_id, action="rent")
+
+    @app.post("/hardware/{internal_id}/return")
+    async def return_item(request: Request, internal_id: str):
+        return await rental_transition(request, internal_id, action="return")
 
     @app.get("/admin/users", response_class=HTMLResponse)
     async def admin_users(request: Request):
@@ -436,8 +652,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         form = await request.form()
         values = _submitted_values(form)
         try:
-            updated = update_hardware(request.app.state.hardware, internal_id, form)
+            updated = update_hardware(
+                request.app.state.hardware,
+                internal_id,
+                form,
+                acting_user_id=user["id"],
+            )
         except (InventoryInputError, InventoryConflictError) as exc:
+            record = request.app.state.hardware.get(lambda item: item.get("id") == internal_id)
+            if record is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
             response_status = (
                 status.HTTP_409_CONFLICT
                 if isinstance(exc, InventoryConflictError)

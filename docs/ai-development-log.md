@@ -78,3 +78,48 @@ Browser verification found no layout or redaction regression: the administrator 
 both source-ID `4` edit links, source `7` rendered only the redacted legacy-assignee
 label, source `10` retained blank/null/Unknown evidence after correction, and the
 390-pixel layout kept horizontal overflow inside the table container.
+
+## Slice 3 — guarded rental
+
+The approved rental boundary is deliberately narrow: active ordinary users can rent
+multiple items concurrently, but only from a freshly read available and unheld state
+without critical findings. Warnings remain non-blocking. Only the current holder can
+return an item; returns are not finding-gated. Administrators retain traceability through resolved application-user emails and can
+release a held item only through the bounded edit override; they cannot use rent/return
+routes.
+Due dates are not part of this slice.
+
+The work began with a test-first browser/storage journey, then review split the
+oversized scenario into focused role, rent, return, privacy, and safety-handoff tests
+with small shared helpers. Together they preserve the critical rejection, warning-only
+rental, repeated-action no-write behavior, owner-only return, administrator denial,
+append-only UTC history, and privacy-aware rendering assertions. Review corrections
+also scope status-filter choices by role, reject crafted ordinary-user correction
+filters, and prove that safety evidence added during a rental never blocks the owner
+return but immediately blocks the next rent.
+
+Rental history is rendered newest first while the stored history remains append-only
+oldest first. Ordinary viewers see only `You` or `Another user`; administrators see
+resolved emails and `Unknown user` for a missing actor. Imported legacy assignee
+evidence remains unresolved and redacted. TinyDB is intentionally limited to a
+single-worker deployment: each accepted rent/return transition re-reads current state
+before its one TinyDB update, without a transaction or multi-worker guarantee.
+
+The focused and full pytest runs retain the pre-existing FastAPI/Starlette TestClient
+deprecation warning. It is recorded as an existing dependency warning, not treated as
+new Slice 3 behavior or as validation failure.
+
+## Slice 3 PR correction — administrator held-item release
+
+Review clarified that an administrator needs a bounded operational release for an
+application-held item without gaining access to ordinary rent/return routes. The
+existing administrator edit POST now accepts `Available` or `Repair` only when a
+fresh held record is canonically `In Use`. One full-record TinyDB update applies the
+validated metadata, clears the holder, appends an `admin_release` event attributed to
+the acting administrator, and reuses its UTC event timestamp as `updated_at`.
+
+Metadata-only edits keep a held item and its history untouched. Inconsistent held
+states are not normalized, deletion remains server-side rejected while held, and the
+edit page omits the active Delete POST form until the item is released. History uses
+the existing privacy policy: administrators see a resolved actor email, ordinary
+users see role-safe labels, and no page exposes a raw UUID.
