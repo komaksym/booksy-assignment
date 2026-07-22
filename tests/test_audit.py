@@ -48,12 +48,12 @@ def test_audit_access_and_deterministic_get(
     settings: Settings,
 ) -> None:
     for method, route in (
-    (client.get, "/admin/audit"),
-    (client.post, "/admin/audit/llm"),
-):
-    response = method(route, follow_redirects=False)
-    assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+        (client.get, "/admin/audit"),
+        (client.post, "/admin/audit/llm"),
+    ):
+        response = method(route, follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers["location"] == "/login"
 
     calls = 0
 
@@ -83,7 +83,9 @@ def test_audit_access_and_deterministic_get(
     records = app.state.hardware.all()
     source_ten = next(record for record in records if record["source_id"] == 10)
     assert f'href="/hardware/{source_ten["id"]}"' in response.text
-    assert response.text.index("Unknown Device") < response.text.index("Duplicate ID Test Laptop")
+    assert response.text.index("Unknown Device") < response.text.index(
+        "Duplicate ID Test Laptop"
+    )
 
     create_response = client.post(
         "/admin/users",
@@ -113,7 +115,7 @@ def test_audit_falls_back_without_mutating_inventory(
     before = copy.deepcopy(app.state.hardware.all())
     calls = 0
 
-    def should_not_run(request: httpx.Request) -> httpx.Response:
+    def should_not_run(_request: httpx.Request) -> httpx.Response:
         nonlocal calls
         calls += 1
         return _provider_response('{"findings":[]}')
@@ -168,7 +170,9 @@ def test_valid_deepseek_response_uses_allowlist_and_renders_suggestions(
                             "hardware_id": target["id"],
                             "severity": "warning",
                             "explanation": "The imported brand may contain a spelling error.",
-                            "recommendation": "Verify the manufacturer against purchase records.",
+                            "recommendation": (
+                                "Verify the manufacturer against purchase records."
+                            ),
                         }
                     ]
                 }
@@ -213,7 +217,9 @@ def test_valid_deepseek_response_uses_allowlist_and_renders_suggestions(
         "deterministic_findings",
     }
     assert all(set(item) == expected_keys for item in snapshot)
-    assert {item["hardware_id"] for item in snapshot} == {record["id"] for record in records}
+    assert {item["hardware_id"] for item in snapshot} == {
+        record["id"] for record in records
+    }
 
     unknown_device = next(item for item in snapshot if item["name"] == "Unknown Device")
     assert unknown_device["status"] is None
@@ -292,7 +298,7 @@ def test_invalid_deepseek_output_is_rejected_atomically(
         )
 
     app.state.llm_transport = httpx.MockTransport(
-        lambda request: _provider_response(content)
+        lambda _request: _provider_response(content)
     )
     response = client.post("/admin/audit/llm")
 
