@@ -83,9 +83,7 @@ def test_audit_access_and_deterministic_get(
     records = app.state.hardware.all()
     source_ten = next(record for record in records if record["source_id"] == 10)
     assert f'href="/hardware/{source_ten["id"]}"' in response.text
-    assert response.text.index("Unknown Device") < response.text.index(
-        "Duplicate ID Test Laptop"
-    )
+    assert response.text.index("Unknown Device") < response.text.index("Duplicate ID Test Laptop")
 
     create_response = client.post(
         "/admin/users",
@@ -170,9 +168,7 @@ def test_valid_deepseek_response_uses_allowlist_and_renders_suggestions(
                             "hardware_id": target["id"],
                             "severity": "warning",
                             "explanation": "The imported brand may contain a spelling error.",
-                            "recommendation": (
-                                "Verify the manufacturer against purchase records."
-                            ),
+                            "recommendation": ("Verify the manufacturer against purchase records."),
                         }
                     ]
                 }
@@ -217,9 +213,7 @@ def test_valid_deepseek_response_uses_allowlist_and_renders_suggestions(
         "deterministic_findings",
     }
     assert all(set(item) == expected_keys for item in snapshot)
-    assert {item["hardware_id"] for item in snapshot} == {
-        record["id"] for record in records
-    }
+    assert {item["hardware_id"] for item in snapshot} == {record["id"] for record in records}
 
     unknown_device = next(item for item in snapshot if item["name"] == "Unknown Device")
     assert unknown_device["status"] is None
@@ -297,9 +291,7 @@ def test_invalid_deepseek_output_is_rejected_atomically(
             }
         )
 
-    app.state.llm_transport = httpx.MockTransport(
-        lambda _request: _provider_response(content)
-    )
+    app.state.llm_transport = httpx.MockTransport(lambda _request: _provider_response(content))
     response = client.post("/admin/audit/llm")
 
     assert response.status_code == 200

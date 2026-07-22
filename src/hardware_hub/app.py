@@ -12,13 +12,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from hardware_hub.auth import (
-    UserInputError,
-    authenticate,
-    bootstrap_admin,
-    create_user,
-    current_user,
-)
 from hardware_hub.audit import (
     AuditUnavailableError,
     LLMFinding,
@@ -27,6 +20,13 @@ from hardware_hub.audit import (
     build_deterministic_rows,
     llm_configuration_status,
     request_deepseek_audit,
+)
+from hardware_hub.auth import (
+    UserInputError,
+    authenticate,
+    bootstrap_admin,
+    create_user,
+    current_user,
 )
 from hardware_hub.config import Settings
 from hardware_hub.db import hardware_table, metadata_table, open_db, users_table
