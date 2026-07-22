@@ -1,4 +1,4 @@
-"""Application settings for the first delivery slice."""
+"""Application runtime settings."""
 
 from pathlib import Path
 from typing import Literal
