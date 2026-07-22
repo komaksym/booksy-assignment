@@ -31,6 +31,12 @@ from hardware_hub.inventory import (
     transition_repair,
     update_hardware,
 )
+from hardware_hub.rental import (
+    RentalConflictError,
+    RentalPermissionError,
+    rent_hardware,
+    return_hardware,
+)
 from hardware_hub.rules import Finding, find_issues
 
 _PACKAGE_DIR = Path(__file__).parent
@@ -188,6 +194,34 @@ def _hardware_form_context(
     }
 
 
+def _visible_hardware(hardware: Any, user: dict[str, Any], internal_id: str) -> dict[str, Any]:
+    """Load one item by internal ID, concealing invalid canonical state from users."""
+
+    record = hardware.get(lambda item: item.get("id") == internal_id)
+    if record is None or (user["role"] != "admin" and record.get("status") is None):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return record
+
+
+def _detail_response(
+    request: Request,
+    user: dict[str, Any],
+    internal_id: str,
+    *,
+    error: str | None = None,
+    status_code: int = status.HTTP_200_OK,
+) -> HTMLResponse:
+    """Render a fresh canonical hardware detail response."""
+
+    record = _visible_hardware(request.app.state.hardware, user, internal_id)
+    return _TEMPLATES.TemplateResponse(
+        request=request,
+        name="hardware_detail.html",
+        context={"user": user, "record": record, "error": error},
+        status_code=status_code,
+    )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Create a configured Hardware Hub application."""
 
@@ -314,6 +348,60 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
         request.session.clear()
         return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.get("/hardware/{internal_id}", response_class=HTMLResponse)
+    async def hardware_detail(request: Request, internal_id: str):
+        user = current_user(request)
+        if user is None:
+            return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+        return _detail_response(request, user, internal_id)
+
+    async def rental_transition(request: Request, internal_id: str, *, action: str):
+        user = current_user(request)
+        if user is None:
+            return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+        _visible_hardware(request.app.state.hardware, user, internal_id)
+        if user["role"] != "user":
+            return _detail_response(
+                request,
+                user,
+                internal_id,
+                error="Administrators cannot rent or return hardware.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            updated = (
+                rent_hardware(request.app.state.hardware, internal_id, user["id"])
+                if action == "rent"
+                else return_hardware(request.app.state.hardware, internal_id, user["id"])
+            )
+        except RentalConflictError as exc:
+            return _detail_response(
+                request,
+                user,
+                internal_id,
+                error=str(exc),
+                status_code=status.HTTP_409_CONFLICT,
+            )
+        except RentalPermissionError as exc:
+            return _detail_response(
+                request,
+                user,
+                internal_id,
+                error=str(exc),
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        if updated is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        return RedirectResponse(f"/hardware/{internal_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.post("/hardware/{internal_id}/rent")
+    async def rent(request: Request, internal_id: str):
+        return await rental_transition(request, internal_id, action="rent")
+
+    @app.post("/hardware/{internal_id}/return")
+    async def return_item(request: Request, internal_id: str):
+        return await rental_transition(request, internal_id, action="return")
 
     @app.get("/admin/users", response_class=HTMLResponse)
     async def admin_users(request: Request):

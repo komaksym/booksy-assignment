@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}{{ record.name }} · Hardware Hub{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Hardware detail</p>
+      <h1>{{ record.name }}</h1>
+      <p class="muted">{{ record.brand if record.brand is not none else "—" }} · {{ record.purchase_date if record.purchase_date is not none else "—" }}</p>
+    </div>
+    <a class="button button-outline" href="/">Back to inventory</a>
+  </section>
+
+  {% if error %}
+    <p class="alert" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <section class="card" aria-label="Hardware status">
+    <p>
+      <span class="status-badge status-{{ record.status | lower | replace(' ', '-') }}">
+        {{ record.status }}
+      </span>
+    </p>
+  </section>
+{% endblock %}
