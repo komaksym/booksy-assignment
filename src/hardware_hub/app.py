@@ -45,6 +45,15 @@ _SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
 _ORIGINAL_SOURCE_COUNT = 11
 
 
+def _dashboard_record(record: dict[str, Any], user: dict[str, Any]) -> dict[str, Any]:
+    """Project one stored record to the fields rendered by its dashboard role."""
+
+    fields = ["id", "name", "brand", "purchase_date", "status"]
+    if user["role"] == "admin":
+        fields.insert(1, "source_id")
+    return {field: record.get(field) for field in fields}
+
+
 def _dashboard_context(
     *,
     user: dict[str, Any],
@@ -68,18 +77,19 @@ def _dashboard_context(
 
     rows = []
     for record in records:
-        row = dict(record)
+        row = _dashboard_record(record, user)
         record_findings = by_hardware.get(str(record["id"]), [])
         if user["role"] == "admin":
             row["findings"] = record_findings
-        row.update(_circulation_action(record, user, record_findings))
-        row["repair_action"] = (
-            "mark-repair"
-            if record.get("holder_user_id") is None and record.get("status") == "Available"
-            else "clear-repair"
-            if record.get("holder_user_id") is None and record.get("status") == "Repair"
-            else None
-        )
+            row["repair_action"] = (
+                "mark-repair"
+                if record.get("holder_user_id") is None and record.get("status") == "Available"
+                else "clear-repair"
+                if record.get("holder_user_id") is None and record.get("status") == "Repair"
+                else None
+            )
+        else:
+            row.update(_circulation_action(record, user, record_findings))
         rows.append(row)
 
     brands = sorted(

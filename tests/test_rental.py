@@ -54,6 +54,19 @@ def test_rent_and_return_enforce_safety_ownership_and_history(client, app: FastA
     response = client.get("/")
     assert response.status_code == 200
     assert "Confidential Canonical Brand" not in response.text
+    assert all(
+        set(row)
+        == {
+            "id",
+            "name",
+            "brand",
+            "purchase_date",
+            "status",
+            "rental_action",
+            "rental_reason",
+        }
+        for row in response.context["records"]
+    )
     assert f'href="/hardware/{source_one["id"]}"' in response.text
     assert f'<form method="post" action="/hardware/{source_one["id"]}/rent">' in response.text
 
@@ -187,6 +200,20 @@ def test_rent_and_return_enforce_safety_ownership_and_history(client, app: FastA
         "<strong>Rent</strong>"
     )
     assert history.group(1).count("You") == 2
+    assert first_user["id"] not in history.group(1)
+
+    client.post("/logout", follow_redirects=False)
+    response = client.post(
+        "/login",
+        data={"email": "admin@booksy.test", "password": "admin-password"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    app.state.users.remove(Query().id == first_user["id"])
+    response = client.get(f"/hardware/{source_one['id']}")
+    assert response.status_code == 200
+    assert "Unknown user" in response.text
+    assert first_user["id"] not in response.text
 
     client.post("/logout", follow_redirects=False)
     _login(client, second_user["email"])
