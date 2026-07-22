@@ -84,18 +84,19 @@ label, source `10` retained blank/null/Unknown evidence after correction, and th
 The approved rental boundary is deliberately narrow: active ordinary users can rent
 multiple items concurrently, but only from a freshly read available and unheld state
 without critical findings. Warnings remain non-blocking. Only the current holder can
-return an item; returns are not finding-gated. Administrators retain traceability
-through resolved application-user emails but cannot rent, return, or force a return.
+return an item; returns are not finding-gated. Administrators retain traceability through resolved application-user emails and can
+release a held item only through the bounded edit override; they cannot use rent/return
+routes.
 Due dates are not part of this slice.
 
-The work followed one test-first browser/storage journey, then bounded implementation
-tasks and independent review. The journey covers a critical rejection, warning-only
+The work began with a test-first browser/storage journey, then review split the
+oversized scenario into focused role, rent, return, privacy, and safety-handoff tests
+with small shared helpers. Together they preserve the critical rejection, warning-only
 rental, repeated-action no-write behavior, owner-only return, administrator denial,
-append-only UTC history, and privacy-aware rendering. Review first added safe
-detail-page POST controls; later review corrections prevented canonical-null values
-from leaking through ordinary-user dashboard options and projected dashboard rows so
-raw holder IDs, event data, timestamps, and other stored evidence never reach
-ordinary-user templates.
+append-only UTC history, and privacy-aware rendering assertions. Review corrections
+also scope status-filter choices by role, reject crafted ordinary-user correction
+filters, and prove that safety evidence added during a rental never blocks the owner
+return but immediately blocks the next rent.
 
 Rental history is rendered newest first while the stored history remains append-only
 oldest first. Ordinary viewers see only `You` or `Another user`; administrators see

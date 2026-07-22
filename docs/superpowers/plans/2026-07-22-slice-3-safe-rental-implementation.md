@@ -81,12 +81,11 @@ def return_hardware(hardware: Table, internal_id: str, user_id: str) -> dict[str
   must not render raw `rental_history` or user IDs; Task 2 adds privacy-resolved
   history and completes the presentation.
 
-- [ ] **Step 1: Write the failing HTTP/storage journey**
+- [ ] **Step 1: Write failing focused HTTP/storage tests**
 
-Create
-`test_rent_and_return_enforce_safety_ownership_and_history` in
-`tests/test_rental.py`. Use `create_user`, two ordinary users, the existing client,
-`Query`, and deep document snapshots. The test must execute these states in order:
+Create focused tests in `tests/test_rental.py`. Use `create_user`, two ordinary users,
+the existing client, `Query`, and deep document snapshots. Split role, rent, return,
+privacy, and no-write behavior into coherent journeys that collectively execute:
 
 ```python
 # user one: source 5 critical rejection, zero-write equality
@@ -118,7 +117,7 @@ field equals the corresponding freshly read pre-transition field.
 Run:
 
 ```bash
-uv run pytest -q tests/test_rental.py::test_rent_and_return_enforce_safety_ownership_and_history
+uv run pytest -q tests/test_rental.py
 ```
 
 Expected: FAIL because the rental/detail routes or rental service do not exist.
@@ -197,12 +196,12 @@ Run:
 
 ```bash
 uv run ruff format src/hardware_hub/rental.py src/hardware_hub/app.py tests/test_rental.py
-uv run pytest -q tests/test_rental.py::test_rent_and_return_enforce_safety_ownership_and_history
+uv run pytest -q tests/test_rental.py
 uv run ruff check .
 uv run pytest -q
 ```
 
-Expected: focused rental journey passes; the complete suite passes. The existing
+Expected: focused rental tests pass; the complete suite passes. The existing
 Starlette deprecation warning may remain, but no new warning is accepted.
 
 - [ ] **Step 6: Report for root integration**
@@ -231,9 +230,9 @@ dispatches the task reviewer before Task 2.
 - Existing administrator edit/repair actions and ordinary dashboard filtering remain
   behaviorally unchanged.
 
-- [ ] **Step 1: Extend the journey with failing presentation/privacy assertions**
+- [ ] **Step 1: Add failing presentation/privacy assertions to focused tests**
 
-Add assertions at the existing journey's natural points:
+Add assertions at the focused tests' natural points:
 
 ```python
 # Before rent: ordinary dashboard has a source-1 detail link and rent form.
@@ -252,7 +251,7 @@ Scope text-order assertions to a stable history element such as
 
 - [ ] **Step 2: Run the focused test and capture RED**
 
-Run the same focused pytest node. Expected: FAIL on absent contextual actions,
+Run `uv run pytest -q tests/test_rental.py`. Expected: FAIL on absent contextual actions,
 privacy labels, administrator evidence, or completed detail markup. Record the
 specific expected failure before changing production presentation code.
 
@@ -331,13 +330,13 @@ Run:
 
 ```bash
 uv run ruff format src/hardware_hub/app.py tests/test_rental.py
-uv run pytest -q tests/test_rental.py::test_rent_and_return_enforce_safety_ownership_and_history
+uv run pytest -q tests/test_rental.py
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest -q
 ```
 
-Expected: focused journey and full suite pass, with no new warning.
+Expected: focused tests and full suite pass, with no new warning.
 
 - [ ] **Step 8: Report for root integration**
 
@@ -366,7 +365,7 @@ Update README behavior/manual-journey sections to cover:
 ```text
 ordinary users only; multiple concurrent holdings; critical findings block rent;
 warnings do not; owner-only return; You/Another user privacy; admin email traceability;
-single-worker TinyDB limitation; no admin forced return or due dates
+single-worker TinyDB limitation; admin release only through edit; no reassignment or due dates
 ```
 
 Preserve existing setup, environment, seed, and Slice 2 documentation. Do not claim
@@ -374,8 +373,8 @@ Slice 4 audit, Railway readiness, deployment verification, or broad concurrency.
 
 - [ ] **Step 2: Record implementation decisions in the AI development log**
 
-Add a concise Slice 3 entry containing the user-approved decisions, test-first
-journey, subagent/reviewer workflow, any corrections made after review, and the
+Add a concise Slice 3 entry containing the user-approved decisions, test-first focused
+tests, subagent/reviewer workflow, any corrections made after review, and the
 known Starlette warning. Never include secrets, generated passwords, or private
 legacy email values.
 

@@ -107,7 +107,9 @@ def test_ordinary_inventory_exposes_safe_actions_without_private_data(client, ap
 
     available_detail = client.get(f"/hardware/{source_one['id']}")
     assert available_detail.status_code == 200
-    assert f'<form method="post" action="/hardware/{source_one["id"]}/rent">' in available_detail.text
+    assert (
+        f'<form method="post" action="/hardware/{source_one["id"]}/rent">' in available_detail.text
+    )
 
     blocked_detail = client.get(f"/hardware/{source_five['id']}")
     assert blocked_detail.status_code == 200
@@ -178,7 +180,9 @@ def test_return_enforces_owner_and_role_while_history_stays_private(client, app:
     source_ten = _source(hardware, 10)
 
     _login(client, first_user["email"])
-    assert client.post(f"/hardware/{source_one['id']}/rent", follow_redirects=False).status_code == 303
+    assert (
+        client.post(f"/hardware/{source_one['id']}/rent", follow_redirects=False).status_code == 303
+    )
     rented = hardware.get(Query().id == source_one["id"])
     assert rented is not None
 
@@ -265,7 +269,9 @@ def test_owner_can_return_after_admin_adds_safety_evidence_and_next_rent_is_bloc
     source_one = _source(hardware, 1)
 
     _login(client, holder["email"])
-    assert client.post(f"/hardware/{source_one['id']}/rent", follow_redirects=False).status_code == 303
+    assert (
+        client.post(f"/hardware/{source_one['id']}/rent", follow_redirects=False).status_code == 303
+    )
     held = hardware.get(Query().id == source_one["id"])
     assert held is not None
 

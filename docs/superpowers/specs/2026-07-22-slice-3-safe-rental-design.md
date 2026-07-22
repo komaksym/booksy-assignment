@@ -49,7 +49,7 @@ Slice 3 includes only:
 - structured embedded rent/return and administrator-release events;
 - privacy-aware application-history rendering;
 - administrator access to resolved renter identities and imported legacy evidence;
-- one end-to-end two-user rental test; and
+- focused rental tests with small shared helpers; and
 - desktop and narrow-width smoke evidence plus a PR screenshot.
 
 ## Explicit Non-Goals
@@ -327,7 +327,7 @@ Responsibilities:
   presentation context, and identity resolution;
 - templates render only the actions, reasons, fields, and history supplied in
   context; they do not decide whether a mutation is allowed; and
-- `tests/test_rental.py` proves the browser-visible journey and stored invariants.
+- `tests/test_rental.py` proves focused browser-visible journeys and stored invariants.
 
 Do not change the stored hardware shape, seed fixture, deterministic rule codes,
 authentication model, dependencies, or database helpers for this slice.
@@ -395,16 +395,10 @@ The implementation may select the more specific rent message after evaluating th
 fresh state, but it must not expose another user's email or imported evidence to an
 ordinary user. Templates HTML-escape every message normally.
 
-## Automated Acceptance Journey
+## Automated Acceptance Coverage
 
-Add one integration test named:
-
-```text
-test_rent_and_return_enforce_safety_ownership_and_history
-```
-
-Use the existing application/TestClient fixture and two administrator-created
-ordinary users. The test performs one coherent browser journey:
+Use the existing application/TestClient fixture and focused tests with small shared
+helpers. Together they cover these browser-visible journeys:
 
 1. log in as the first ordinary user;
 2. snapshot source `5`, POST its rent route, expect `409`, and assert the complete
@@ -429,16 +423,16 @@ ordinary users. The test performs one coherent browser journey:
 10. assert the history container renders its `Return` event before its `Rent` event
     and labels both events `You` for their actor.
 
-Also retain the full existing auth, seed, finding, and inventory suite. Do not split
-the journey into broad low-value helper tests unless a discovered defect requires a
-small regression test.
+Also retain the full existing auth, seed, finding, and inventory suite. Keep shared
+helpers small and behavior-focused, and preserve the complete storage, authorization,
+privacy, rendering, and no-write assertion set while splitting the journeys.
 
 ## Implementation Sequence
 
-### Task 3.1 — Write the failing rental journey
+### Task 3.1 — Write failing focused rental tests
 
-- [ ] Create `tests/test_rental.py` with the complete journey above.
-- [ ] Run only that test and capture the expected failure before production code.
+- [ ] Create focused tests in `tests/test_rental.py` covering the complete behavior above.
+- [ ] Run the focused test file and capture the expected failure before production code.
 - [ ] Keep assertions on stored documents as well as rendered responses; buttons
       alone do not prove server safety.
 
@@ -521,7 +515,7 @@ flowchart LR
   sees raw user UUIDs or the legacy assignee email.
 - Dashboard and detail controls work without JavaScript and explain disabled states
   without leaking sensitive evidence.
-- The focused rental journey and complete existing suite pass.
+- The focused rental tests and complete existing suite pass.
 - Ruff, the package build, desktop/narrow smoke checks, and fresh read-only review
   pass.
 - The PR contains factual validation, the required DAG, and a screenshot.

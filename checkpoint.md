@@ -101,7 +101,12 @@ git diff --check
 passed
 ```
 
-## Next task — not started
+## Task 2 — implemented; final review pending
+
+The focused rental-test refactor, safety-handoff regression, and role-scoped status
+filters are implemented. The original requirements below remain as the preserved
+handoff contract.
+
 
 Use `.superpowers/sdd/pr-review-task-2-brief.md` as the exact task requirements.
 Dispatch a fresh bounded implementer with no Git authority, then a fresh read-only
