@@ -730,11 +730,11 @@ tbody tr:last-child td {
     min-width: 0;
   }
 
-  .form-card {
+  .admin-grid .form-card {
     order: 1;
   }
 
-  .table-card {
+  .admin-grid .table-card {
     order: 2;
   }
 }
