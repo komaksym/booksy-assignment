@@ -53,7 +53,9 @@ runtime.
 - Immutable raw payloads beside editable canonical brand, date, status, notes, and history.
 - Eight pure deterministic rules producing the exact 11 initial finding occurrences.
 - Authenticated inventory filtering and stable sorting with visible validation errors.
-- Administrator create, edit, hard-delete, mark-repair, and clear-repair operations.
+- Administrator create, edit, hard-delete, mark-repair, and clear-repair operations;
+  editing an application-held `In Use` item may atomically release it to `Available`
+  or `Repair` with an attributable history entry.
 - Side-by-side source/canonical correction with legacy assignee redaction.
 - Ordinary-user views that omit canonical-null rows, findings, provenance, and admin controls.
 - Responsive sidebar/top navigation and table-scoped narrow-screen overflow.
@@ -93,7 +95,7 @@ runtime.
 ### Partial or missing by design
 
 LLM auditing and Railway deployment belong to the later review-gated Slice 4. Slice 3
-intentionally includes no administrator forced-return path or due dates, audit page,
+intentionally includes no administrator rent/return route, due dates, audit page,
 fake metrics, pagination, JavaScript dependency, or inactive future navigation.
 
 ### Next three priorities

@@ -255,9 +255,17 @@ def _rental_history_context(
             if event.get("user_id") == user["id"]
             else "Another user"
         )
+        event_type = event.get("type")
+        label = (
+            f"Administrator release to {event.get('target_status', 'Unknown')}"
+            if event_type == "admin_release"
+            else "Rent"
+            if event_type == "rent"
+            else "Return"
+        )
         entries.append(
             {
-                "label": "Rent" if event.get("type") == "rent" else "Return",
+                "label": label,
                 "actor": str(actor),
                 "occurred_at": str(event.get("occurred_at", "")),
             }
@@ -626,7 +634,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         form = await request.form()
         values = _submitted_values(form)
         try:
-            updated = update_hardware(request.app.state.hardware, internal_id, form)
+            updated = update_hardware(
+                request.app.state.hardware,
+                internal_id,
+                form,
+                acting_user_id=user["id"],
+            )
         except (InventoryInputError, InventoryConflictError) as exc:
             response_status = (
                 status.HTTP_409_CONFLICT

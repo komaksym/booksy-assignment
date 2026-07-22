@@ -18,6 +18,8 @@ presentation helpers provide already-derived controls and actor labels to Jinja.
 
 - Only active ordinary users may rent or return; administrator transaction POSTs
   return `403` and perform no write.
+- An administrator may use the existing edit submission to release a held canonical
+  `In Use` item to `Available` or `Repair`; this is not a rent/return route.
 - An ordinary user may hold multiple items concurrently.
 - Rent requires freshly read `Available`, null `holder_user_id`, and no target
   finding with severity `critical`; warning-only items remain rentable.
@@ -26,8 +28,11 @@ presentation helpers provide already-derived controls and actor labels to Jinja.
 - Each accepted transition performs exactly one TinyDB update containing status,
   holder, one appended event, and `updated_at`; unrelated fields remain unchanged.
 - Each rejected or repeated transition performs zero writes.
-- Events contain exactly `type`, `user_id`, and aware UTC ISO `occurred_at`; the
-  exact event timestamp is also written to `updated_at`.
+- Rental events contain exactly `type`, `user_id`, and aware UTC ISO `occurred_at`;
+  the exact event timestamp is also written to `updated_at`. An administrator
+  release event additionally contains its exact `target_status`, clears the holder,
+  and is applied with all validated edit metadata in the same full-record TinyDB
+  update.
 - Stored history remains append-only oldest-first; rendered history is newest-first.
 - Ordinary viewers see only `You` / `Another user`; administrators see resolved
   normalized email; missing actors show `Unknown user`; raw user UUIDs never render.
@@ -40,6 +45,8 @@ presentation helpers provide already-derived controls and actor labels to Jinja.
 - Do not change the seed, stored hardware shape, rule codes, authentication model,
   dependencies, or database helpers. Do not implement Slice 4 behavior.
 - All actions are standard POST forms that work without JavaScript.
+- Held-item edit pages omit the active Delete POST form and state why deletion is
+  unavailable; server-side deletion rejection remains authoritative.
 - Root agent alone owns staging, commits, pushes, screenshot publication, and PR
   creation. Subagents leave Git state untouched and report changes through files.
 

@@ -42,10 +42,11 @@ Slice 3 includes only:
 - authenticated hardware detail pages;
 - contextual rent/return controls on the dashboard and detail page;
 - ordinary-user-only rent and return POST routes;
+- administrator release of an application-held item through the existing edit POST;
 - fresh-record validation against status, holder, ownership, and critical
   deterministic findings;
 - one complete TinyDB update for each accepted transition;
-- structured embedded rent/return events;
+- structured embedded rent/return and administrator-release events;
 - privacy-aware application-history rendering;
 - administrator access to resolved renter identities and imported legacy evidence;
 - one end-to-end two-user rental test; and
@@ -55,7 +56,8 @@ Slice 3 includes only:
 
 Slice 3 does not add:
 
-- administrator rental, forced return, reassignment, or holder editing;
+- administrator rental, reassignment, or holder editing; the existing edit form may
+  release an application-held item only to `Available` or `Repair`;
 - a one-item-per-user limit;
 - due dates, renewals, reservations, queues, approvals, or notifications;
 - a global rentals page or user-level rental history page;
@@ -78,8 +80,11 @@ Slice 3 builds on Slice 2 without changing its data strategy:
 - `rental_history` is an embedded list initialized empty;
 - findings remain transient output from `find_issues(records, today)`;
 - source `assignedTo` remains redacted and unresolved; and
-- administrator inventory edits may correct metadata while a holder exists, but
-  may not change status, repair, or delete that item.
+- administrator inventory edits may correct metadata while a holder exists. When the
+  held record is canonically `In Use`, the same edit may release it only to
+  `Available` or `Repair`; it clears the holder and records an attributable event.
+  A held record in another canonical state is not normalized by this path, and no
+  held record may be deleted.
 
 Slice 3 does not reinterpret the two imported `In Use` records. Sources `2` and
 `7` still have null application holders and an `UNRESOLVED_HOLDER` finding. No
@@ -95,6 +100,7 @@ account.
 | Rent safe available item | yes | no; return `403` |
 | Return own item | yes | no; return `403` |
 | Return another user's item | no; return `403` | no |
+| Release an application-held item via edit to `Available` or `Repair` | no | yes |
 | See application history | yes | yes |
 | See history actor | `You` / `Another user` | resolved user email |
 | See deterministic finding detail | no | yes |
@@ -207,6 +213,15 @@ rental_history    -> prior events plus one return event
 updated_at        -> event timestamp
 ```
 
+Administrator edit release changes, only from a held canonical `In Use` record:
+
+```text
+status            -> chosen Available or Repair value
+holder_user_id    -> null
+rental_history    -> prior events plus one admin_release event
+updated_at        -> event timestamp
+```
+
 All other hardware fields, including `raw_payload`, `source_id`, canonical
 metadata, notes, and legacy history, retain their freshly read values.
 
@@ -222,8 +237,11 @@ Each accepted transition appends exactly one JSON object:
 }
 ```
 
-- `type` is exactly `rent` or `return`;
-- `user_id` is the acting ordinary user's internal UUID string;
+- `type` is exactly `rent`, `return`, or `admin_release`;
+- `user_id` is the acting ordinary user's internal UUID string for rental events or
+  the acting administrator's internal UUID string for an administrator release;
+- an `admin_release` event additionally has `target_status` exactly `Available` or
+  `Repair`;
 - `occurred_at` is an aware UTC ISO-8601 timestamp;
 - `updated_at` receives the exact same timestamp string; and
 - stored events remain append-only and oldest-first.
@@ -238,7 +256,8 @@ resolves identities against the current users table on every request:
 
 - an ordinary viewer sees `You` for their own event and `Another user` for every
   other event;
-- an administrator sees the resolved user's normalized email;
+- an administrator sees the resolved user's normalized email, including the actor
+  for an administrator release;
 - an event whose user no longer exists displays `Unknown user`; and
 - no viewer sees a raw user UUID.
 
@@ -349,6 +368,10 @@ Administrators additionally see deterministic finding badges and the existing
 allowlisted imported-evidence view. Imported history remains visible there, and
 legacy assignee presence remains redacted. Ordinary users see neither findings nor
 imported evidence.
+
+On an administrator edit page, a held item does not render a Delete POST form and
+instead explains that deletion is unavailable while a holder exists. Once released,
+the normal delete control is available again.
 
 The empty-history state says that no Hardware Hub rental activity has been
 recorded. It must not imply that the imported item was never used.

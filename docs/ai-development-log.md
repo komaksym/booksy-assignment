@@ -107,3 +107,18 @@ before its one TinyDB update, without a transaction or multi-worker guarantee.
 The focused and full pytest runs retain the pre-existing FastAPI/Starlette TestClient
 deprecation warning. It is recorded as an existing dependency warning, not treated as
 new Slice 3 behavior or as validation failure.
+
+## Slice 3 PR correction — administrator held-item release
+
+Review clarified that an administrator needs a bounded operational release for an
+application-held item without gaining access to ordinary rent/return routes. The
+existing administrator edit POST now accepts `Available` or `Repair` only when a
+fresh held record is canonically `In Use`. One full-record TinyDB update applies the
+validated metadata, clears the holder, appends an `admin_release` event attributed to
+the acting administrator, and reuses its UTC event timestamp as `updated_at`.
+
+Metadata-only edits keep a held item and its history untouched. Inconsistent held
+states are not normalized, deletion remains server-side rejected while held, and the
+edit page omits the active Delete POST form until the item is released. History uses
+the existing privacy policy: administrators see a resolved actor email, ordinary
+users see role-safe labels, and no page exposes a raw UUID.

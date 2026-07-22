@@ -81,9 +81,13 @@
               </button>
             </form>
           {% endif %}
-          <form method="post" action="/admin/hardware/{{ record.id }}/delete">
-            <button class="button button-danger" type="submit">Delete hardware</button>
-          </form>
+          {% if record.holder_user_id is not none %}
+            <p class="muted">This item cannot be deleted while it has a holder.</p>
+          {% else %}
+            <form method="post" action="/admin/hardware/{{ record.id }}/delete">
+              <button class="button button-danger" type="submit">Delete hardware</button>
+            </form>
+          {% endif %}
         </div>
       {% endif %}
     </section>
