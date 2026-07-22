@@ -1,4 +1,4 @@
-"""FastAPI composition and HTTP routes for the shell/authentication slice."""
+"""FastAPI composition and HTTP routes for Hardware Hub."""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -47,6 +47,14 @@ def _dashboard_context(
     filters: dict[str, str],
     error: str | None,
 ) -> dict[str, Any]:
+    """Build template-ready dashboard state without mutating stored hardware.
+
+    ``all_records`` drives global brands and administrator finding totals, while
+    ``records`` is the already filtered and sorted subset rendered in the table.
+    Each table row is copied before presentation-only findings and repair actions
+    are attached.
+    """
+
     findings = find_issues(all_records, date.today()) if user["role"] == "admin" else ()
     by_hardware: dict[str, list[Finding]] = {}
     for finding in findings:
@@ -87,6 +95,12 @@ def _dashboard_context(
 
 
 def _form_values(record: dict[str, Any] | None = None) -> dict[str, object]:
+    """Return editable values for one hardware item or a blank creation form.
+
+    A ``record`` here is the complete stored document for one hardware item, not
+    an individual field within that item.
+    """
+
     if record is None:
         return {
             "name": "",
@@ -107,6 +121,8 @@ def _form_values(record: dict[str, Any] | None = None) -> dict[str, object]:
 
 
 def _submitted_values(form: Any) -> dict[str, object]:
+    """Retain non-secret editable form values when validation rejects a request."""
+
     return {
         key: str(form.get(key, ""))
         for key in ("name", "brand", "purchase_date", "status", "notes", "legacy_history")
@@ -114,6 +130,8 @@ def _submitted_values(form: Any) -> dict[str, object]:
 
 
 def _original_import(record: dict[str, Any]) -> list[dict[str, str]]:
+    """Return allowlisted source evidence for one item, redacting an assignee email."""
+
     raw = record.get("raw_payload")
     if not isinstance(raw, dict):
         return []
@@ -147,6 +165,13 @@ def _hardware_form_context(
     values: dict[str, object],
     error: str | None,
 ) -> dict[str, Any]:
+    """Build create/edit template state and derive the currently valid repair action.
+
+    The helper exposes only allowlisted raw evidence, and it offers a repair action
+    only for a holderless item in exactly ``Available`` or ``Repair`` state. The
+    mutation route repeats those checks server-side before writing.
+    """
+
     repair_action = None
     if record is not None and record.get("holder_user_id") is None:
         if record.get("status") == "Available":
@@ -455,6 +480,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expected: str,
         target: str,
     ):
+        """Authorize and translate a repair transition result into an HTTP response."""
+
         user = current_user(request)
         if user is None:
             return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
