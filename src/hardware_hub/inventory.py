@@ -1,4 +1,4 @@
-"""Seed import and canonical conversion for the hardware inventory."""
+"""Seed loading, validation, querying, and mutations for the hardware inventory."""
 
 import json
 from collections.abc import Mapping
@@ -11,7 +11,7 @@ from uuid import uuid4
 from tinydb import Query
 from tinydb.table import Table
 
-_SEED_MARKER = "hardware_seed_loaded"
+_SEED_MARKER_KEY = "hardware_seed_loaded"
 _SUPPORTED_STATUSES = {"Available", "In Use", "Repair"}
 _MANUAL_STATUSES = {"Available", "Repair"}
 _SORT_KEYS = {"name", "brand", "purchase_date", "status"}
@@ -28,23 +28,30 @@ class InventoryConflictError(RuntimeError):
 
 
 def import_seed(hardware: Table, metadata: Table) -> int:
-    """Import the bundled fixture once, preserving every source object exactly."""
+    """Copy the bundled source fixture into TinyDB once per database.
 
-    marker = Query()
-    if metadata.contains(marker.key == _SEED_MARKER):
+    The metadata table stores ``{"key": "hardware_seed_loaded"}`` as a durable
+    boolean flag. That flag is the "marker": its presence means initialization has
+    already been handled, even if an administrator later deletes every hardware row.
+    """
+
+    metadata_query = Query()
+    if metadata.contains(metadata_query.key == _SEED_MARKER_KEY):
         return 0
     if len(hardware) > 0:
-        metadata.insert({"key": _SEED_MARKER})
+        metadata.insert({"key": _SEED_MARKER_KEY})
         return 0
 
     source = _load_fixture()
     documents = [_convert_source(record) for record in source]
     hardware.insert_multiple(documents)
-    metadata.insert({"key": _SEED_MARKER})
+    metadata.insert({"key": _SEED_MARKER_KEY})
     return len(documents)
 
 
 def _load_fixture() -> list[dict[object, object]]:
+    """Load and validate the exact bundled eleven-object JSON source fixture."""
+
     fixture = json.loads(
         files("hardware_hub").joinpath("data/hardware_seed.json").read_text(encoding="utf-8")
     )
@@ -56,6 +63,13 @@ def _load_fixture() -> list[dict[object, object]]:
 
 
 def _convert_source(source: dict[object, object]) -> dict[str, object]:
+    """Convert one source object into canonical fields plus immutable evidence.
+
+    Valid operational values populate canonical fields. Malformed values remain
+    available in the deep-copied ``raw_payload`` but become ``None`` canonically so
+    the application does not treat them as trusted inventory state.
+    """
+
     name = source.get("name")
     if not isinstance(name, str) or not name.strip():
         raise ValueError("Hardware seed names must be non-blank strings")
@@ -88,6 +102,8 @@ def _convert_source(source: dict[object, object]) -> dict[str, object]:
 
 
 def _is_strict_date(value: object) -> bool:
+    """Return whether a value is a real date in exact ``YYYY-MM-DD`` form."""
+
     if not isinstance(value, str) or len(value) != 10:
         return False
     try:
