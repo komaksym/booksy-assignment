@@ -13,6 +13,16 @@ from hardware_hub.db import users_table
 _SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
 
 
+def test_login_uses_relative_stylesheet_url_behind_https_proxy(
+    client: TestClient,
+) -> None:
+    response = client.get("/login", headers={"x-forwarded-proto": "https"})
+
+    assert response.status_code == 200
+    assert 'href="/static/app.css"' in response.text
+    assert 'href="http://' not in response.text
+
+
 def session_payload(client: TestClient, settings: Settings) -> dict[str, str]:
     cookie = client.cookies.get("session")
     assert cookie is not None
