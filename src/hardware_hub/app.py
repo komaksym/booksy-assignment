@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.sessions import SessionMiddleware
 
 from hardware_hub.audit import (
@@ -614,7 +615,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         else:
             snapshot = build_audit_snapshot(records, findings)
             try:
-                ai_findings = request_deepseek_audit(
+                ai_findings = await run_in_threadpool(
+                    request_deepseek_audit,
                     snapshot,
                     base_url=runtime.llm_base_url,
                     api_key=runtime.llm_api_key,

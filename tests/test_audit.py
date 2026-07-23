@@ -1,5 +1,6 @@
 import copy
 import json
+import threading
 from uuid import uuid4
 
 import httpx
@@ -40,6 +41,51 @@ def _provider_response(content: str, *, finish_reason: str = "stop") -> httpx.Re
             ]
         },
     )
+
+
+def test_deepseek_request_does_not_block_health(
+    client: TestClient,
+    app: FastAPI,
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _login_admin(client, settings)
+    _configure_llm(app)
+    provider_started = threading.Event()
+    release_provider = threading.Event()
+    health_finished = threading.Event()
+    responses: dict[str, httpx.Response] = {}
+
+    def blocking_provider(*_args: object, **_kwargs: object) -> tuple[()]:
+        provider_started.set()
+        assert release_provider.wait(timeout=2)
+        return ()
+
+    monkeypatch.setattr("hardware_hub.app.request_deepseek_audit", blocking_provider)
+
+    def request_audit() -> None:
+        responses["audit"] = client.post("/admin/audit/llm")
+
+    def request_health() -> None:
+        responses["health"] = client.get("/health")
+        health_finished.set()
+
+    audit_thread = threading.Thread(target=request_audit)
+    health_thread = threading.Thread(target=request_health)
+    audit_thread.start()
+    assert provider_started.wait(timeout=1)
+    health_thread.start()
+    try:
+        assert health_finished.wait(timeout=0.5), (
+            "The blocking provider call prevented /health from responding"
+        )
+    finally:
+        release_provider.set()
+        audit_thread.join(timeout=2)
+        health_thread.join(timeout=2)
+
+    assert responses["health"].status_code == 200
+    assert responses["audit"].status_code == 200
 
 
 def test_audit_access_and_deterministic_get(

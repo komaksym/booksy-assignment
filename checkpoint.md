@@ -6,7 +6,7 @@
 - Branch: `codex/04-audit-release`
 - Pull request: [#4 — feat(audit): complete MVP handoff](https://github.com/komaksym/booksy-assignment/pull/4)
 - Base: merged Slice 3 `main` at `b1d0a959`
-- Latest verified code head before this documentation refresh: `8a83d0d2`
+- Latest fully deployed release head before the final review fixes: `7456161`
 - Pull request is open, mergeable, and ready for code review.
 
 ## Implemented contract
@@ -60,8 +60,8 @@ uv build
 git diff --check
 ```
 
-After independent review corrections, normal pull-request CI passed on code head
-`8a83d0d2`:
+After independent review corrections, normal pull-request CI passed on release head
+`7456161`:
 
 ```text
 uv sync --locked
@@ -70,8 +70,10 @@ uv run ruff check .
 uv run pytest -q
 ```
 
-A new exact-head CI run is required after this documentation-only checkpoint refresh.
-The known Starlette `TestClient` deprecation warning remains pre-existing.
+The final review additionally identified that the synchronous DeepSeek client needed
+to run outside the single Uvicorn event loop. A concurrency regression now proves that
+`/health` remains responsive during a blocked provider call. The known Starlette
+`TestClient` deprecation warning remains pre-existing.
 
 ## Independent follow-up review
 
@@ -81,15 +83,13 @@ fallback. Commit `868555f` expands the invalid-envelope boundary, and `637ebab` 
 focused regressions for that shape and non-stop completions. No remaining Critical or
 Important code issue was found afterward.
 
-## External verification still pending
+## External verification complete
 
-The code is review-ready, but the complete live release cannot be claimed yet:
+- Public service: `https://booksy-assignment-production.up.railway.app`
+- `/health`, bootstrap login, user creation, all 11 records, source `10` correction,
+  safe rent/return, deterministic audit, and one real DeepSeek response passed.
+- Desktop and 390 px audit screenshots are stored in `docs/assets/` and linked from PR #4.
+- Manual redeploy `d980b950-3e8c-4195-a12f-b00ffcf1055f` preserved the created user,
+  corrected source `10`, and rental history on the mounted `/data` volume.
 
-- no fresh desktop or narrow-viewport browser smoke or screenshot;
-- no funded real DeepSeek request;
-- no public Railway deployment URL;
-- no Railway volume/redeploy persistence verification.
-
-These require the user-controlled Railway project, mounted `/data` volume, provider key,
-and sealed production secrets. Do not add a live URL or success claim until those checks
-actually pass. Do not merge PR #4 without explicit user approval.
+PR #4 remains open for explicit user review and must not be merged without approval.

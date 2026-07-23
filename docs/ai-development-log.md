@@ -154,8 +154,10 @@ The parser now treats object-shape errors as invalid provider responses, and foc
 regressions cover both that envelope and a non-`stop` completion. No remaining Critical
 or Important code issue was found after the correction.
 
-The repository now contains the one-worker Railway configuration and the documented
-`/data` persistence contract, but no public deployment, funded real-provider result,
-new browser screenshot, or redeploy-persistence result is claimed. Those checks remain
-blocked on the user-controlled Railway project, mounted volume, provider key, and
-sealed production secrets.
+The one-worker Railway release is live at
+`https://booksy-assignment-production.up.railway.app`. The authenticated product smoke,
+desktop and narrow screenshots, a funded DeepSeek response, and a manual redeploy all
+passed. The created user, corrected source `10`, and rental history survived that
+redeploy on the mounted `/data` volume. Final review then found that the synchronous
+provider client could block the single event loop, so the route now offloads that call
+and a concurrency regression proves `/health` remains responsive.
