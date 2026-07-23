@@ -1,4 +1,4 @@
-"""Application settings for the first delivery slice."""
+"""Application runtime settings."""
 
 from pathlib import Path
 from typing import Literal
@@ -16,3 +16,6 @@ class Settings(BaseSettings):
     session_secret: str
     bootstrap_admin_email: str
     bootstrap_admin_password: str
+    llm_base_url: str = ""
+    llm_model: str = ""
+    llm_api_key: str = ""

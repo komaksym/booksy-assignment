@@ -2,7 +2,7 @@
   <table>
     <thead>
       <tr>
-        {% if user.role == "admin" %}<th>Source ID</th>{% endif %}
+        {% if user.role == "admin" %}<th>Origin / Source ID</th>{% endif %}
         <th>Name</th>
         <th>Brand</th>
         <th>Purchase date</th>
@@ -17,9 +17,12 @@
       {% for hardware in records %}
         <tr>
           {% if user.role == "admin" %}
-            <td>{{ hardware.source_id if hardware.source_id is not none else "Manual" }}</td>
+            <td>{{ "Imported · #" ~ hardware.source_id if hardware.source_id is not none else "Manual entry" }}</td>
           {% endif %}
-          <td class="hardware-name"><a href="/hardware/{{ hardware.id }}">{{ hardware.name }}</a></td>
+          <td class="hardware-name">
+            <a href="/hardware/{{ hardware.id }}">{{ hardware.name }}</a><br>
+            <small class="muted">Asset ID HH-{{ hardware.id[:8] | upper }}-{{ hardware.id[9:13] | upper }}</small>
+          </td>
           <td>{{ hardware.brand if hardware.brand is not none else "—" }}</td>
           <td>{{ hardware.purchase_date if hardware.purchase_date is not none else "—" }}</td>
           <td>

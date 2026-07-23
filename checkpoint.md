@@ -1,53 +1,58 @@
-# Slice 3 PR Review Checkpoint
+# Slice 4 Audit and Release Checkpoint
 
 ## Repository state
 
 - Repository: `komaksym/booksy-assignment`
-- Branch: `codex/03-rental`
-- Pull request: [#3 — feat(rental): add guarded circulation](https://github.com/komaksym/booksy-assignment/pull/3)
-- Base: `main` at `9cc315c`
-- Latest fully validated implementation/docs commit before this checkpoint refresh: `ec1cb6f`
-- Next slice remains blocked until PR 3 is reviewed and merged.
+- Branch: `codex/04-audit-release`
+- Pull request: [#4 — feat(audit): complete MVP handoff](https://github.com/komaksym/booksy-assignment/pull/4)
+- Base: merged Slice 3 `main` at `b1d0a959`
+- Latest fully deployed release head before the final review fixes: `7456161`
+- Pull request is open, mergeable, and ready for code review.
 
-## Review findings addressed
+## Implemented contract
 
-1. **Administrator held-item recovery**
-   - The existing administrator edit POST can release an application-held canonical
-     `In Use` item to `Available` or `Repair`.
-   - The one full-record update applies validated metadata, clears the holder, appends
-     an attributable `admin_release` event, and shares its UTC timestamp with
-     `updated_at`.
-   - Metadata-only edits preserve holder/history; malformed history, missing actor,
-     held deletion, and inconsistent state changes remain rejected without writes.
+1. **Administrator audit surface**
+   - `GET /admin/audit` renders fresh deterministic findings without calling a provider.
+   - `POST /admin/audit/llm` is administrator-only and returns the same usable page on
+     missing configuration, provider failure, or invalid model output.
+   - Unauthenticated requests redirect to login; ordinary users receive `403`.
 
-2. **Return after newly discovered safety evidence**
-   - A focused HTTP/storage regression rents a safe item, adds `battery swelling`
-     through the administrator edit flow while the item remains held, proves the
-     owner return succeeds, proves `SAFETY_RISK` activates after return, and proves
-     the next rent returns `409` with the full document unchanged.
+2. **Deterministic authority**
+   - Existing `find_issues` rules remain the only operational safety authority.
+   - Findings are rendered in a stable global table with severity, code, hardware link,
+     source ID, and canonical rule message.
+   - The audit routes do not write hardware documents.
 
-3. **Role-scoped status filtering**
-   - Python supplies ordinary choices `Available`, `In Use`, `Repair`.
-   - Administrators additionally receive `Needs correction`.
-   - A crafted ordinary `status=Needs correction` request returns `400` and does not
-     echo the concealed option into the page.
+3. **Allowlisted DeepSeek boundary**
+   - One current snapshot includes all hardware records, including canonical-null rows.
+   - Included fields are internal hardware ID, canonical fields, notes, legacy history,
+     a legacy-assignee-presence boolean, and deterministic code/severity pairs.
+   - Raw payloads, source IDs, users, emails, passwords, sessions, secrets, holders,
+     rental history, and timestamps are excluded.
+   - One configurable HTTPX chat-completions request uses a ten-second timeout, JSON
+     output, disabled thinking, no retries, and a bounded response budget.
 
-4. **Oversized rental test**
-   - The former monolithic scenario is split into focused ordinary-view, rent,
-     return/privacy, and safety-handoff tests with small shared helpers.
-   - Existing authorization, storage, no-write, privacy, history-ordering, warning,
-     multiple-holding, administrator-denial, and canonical-null assertions remain.
-   - The specification, implementation plan, and AI development log now describe
-     focused acceptance coverage rather than requiring one monolithic test function.
+4. **Atomic model validation and fallback**
+   - Pydantic forbids extra fields and validates UUIDs, severity values, and nonblank text.
+   - Missing/empty content, malformed JSON, schema errors, non-stop completions,
+     unexpected envelope shapes, and unknown hardware IDs discard the entire AI result.
+   - Valid AI suggestions render separately under `AI suggestions — not operational
+     decisions` and never mutate or govern inventory.
+
+5. **Release handoff**
+   - `railway.toml` pins one Uvicorn worker and `/health`.
+   - README documents `/data/hardware-hub.json`, environment variables, setup,
+     validation, manual product journey, shortcuts, security boundaries, AI disclosure,
+     missing work, and the post-deployment checklist.
 
 ## Verification evidence
 
-The one-time verification job for commit `ec1cb6f` completed all of the following
-successfully before committing and pushing the final review corrections:
+The implementation runner proved the new audit behavior failed before production code,
+then completed this full package gate before committing the formatted implementation:
 
 ```text
-uv sync --locked
 uv lock --check
+uv sync --locked
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest -q
@@ -55,22 +60,36 @@ uv build
 git diff --check
 ```
 
-The status-filter regression was first committed in a failing RED state. The later
-role-scoped production change turned it green. The known Starlette `TestClient`
-deprecation warning is unchanged.
+After independent review corrections, normal pull-request CI passed on release head
+`7456161`:
 
-## Fresh whole-branch review
+```text
+uv sync --locked
+uv run ruff format --check .
+uv run ruff check .
+uv run pytest -q
+```
 
-A fresh read-only review of the branch from `9cc315c` through `ec1cb6f` found no
-remaining Critical or Important issue in the rental service, administrator release,
-role/visibility checks, status-filter concealment, history privacy, or focused
-regressions.
+The final review additionally identified that the synchronous DeepSeek client needed
+to run outside the single Uvicorn event loop. A concurrency regression now proves that
+`/health` remains responsive during a blocked provider call. The known Starlette
+`TestClient` deprecation warning remains pre-existing.
 
-## Remaining handoff steps
+## Independent follow-up review
 
-1. Mark Slice 3 PR-ready in `PLANS.md`.
-2. Run the permanent CI workflow on the resulting exact head.
-3. Update the PR body with current validation and review-correction details.
-4. Reply to the inline test-refactor thread with explicit AI disclosure and resolve it.
-5. Re-fetch review threads and stop for user review. Do not begin Slice 4 or merge PR 3
-   without explicit user approval.
+Fresh review found one Important issue: a provider response such as
+`{"choices": [null]}` could raise `AttributeError` rather than returning the safe
+fallback. Commit `868555f` expands the invalid-envelope boundary, and `637ebab` adds
+focused regressions for that shape and non-stop completions. No remaining Critical or
+Important code issue was found afterward.
+
+## External verification complete
+
+- Public service: `https://booksy-assignment-production.up.railway.app`
+- `/health`, bootstrap login, user creation, all 11 records, source `10` correction,
+  safe rent/return, deterministic audit, and one real DeepSeek response passed.
+- Desktop and 390 px audit screenshots are stored in `docs/assets/` and linked from PR #4.
+- Manual redeploy `d980b950-3e8c-4195-a12f-b00ffcf1055f` preserved the created user,
+  corrected source `10`, and rental history on the mounted `/data` volume.
+
+PR #4 remains open for explicit user review and must not be merged without approval.

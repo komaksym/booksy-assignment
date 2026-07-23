@@ -20,6 +20,7 @@
     <section class="card detail-card" aria-labelledby="hardware-summary-title">
       <h2 id="hardware-summary-title">Application values</h2>
       <dl class="detail-fields">
+        <div><dt>Asset ID</dt><dd>HH-{{ record.id[:8] | upper }}-{{ record.id[9:13] | upper }}</dd></div>
         <div><dt>Brand</dt><dd>{{ record.brand if record.brand is not none else "—" }}</dd></div>
         <div><dt>Purchase date</dt><dd>{{ record.purchase_date if record.purchase_date is not none else "—" }}</dd></div>
         <div><dt>Status</dt><dd><span class="status-badge status-{{ record.status | lower | replace(' ', '-') if record.status else 'correction' }}">{{ record.status if record.status is not none else "Needs correction" }}</span></dd></div>
@@ -68,7 +69,9 @@
           <li>
             <strong>{{ entry.label }}</strong>
             <span>{{ entry.actor }}</span>
-            <time datetime="{{ entry.occurred_at }}">{{ entry.occurred_at }}</time>
+            <time datetime="{{ entry.occurred_at }}" data-local-datetime>
+              {{ entry.occurred_at[:10] }} {{ entry.occurred_at[11:16] }} UTC
+            </time>
           </li>
         {% endfor %}
       </ol>
@@ -76,4 +79,19 @@
       <p class="muted">No Hardware Hub rental activity has been recorded.</p>
     {% endif %}
   </section>
+
+  <script>
+    const localDateTime = new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    for (const element of document.querySelectorAll("time[data-local-datetime]")) {
+      const date = new Date(element.dateTime);
+      if (!Number.isNaN(date.getTime())) {
+        element.textContent = localDateTime.format(date);
+        element.title = `UTC: ${date.toISOString()}`;
+      }
+    }
+  </script>
 {% endblock %}

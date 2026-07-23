@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Audit · Hardware Hub{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <p class="eyebrow">Administrator audit</p>
+    <h1>Inventory audit</h1>
+    <p class="muted">Deterministic rules are the operational authority. DeepSeek can provide a read-only second opinion, but its suggestions never mutate inventory or control rental decisions.</p>
+  </div>
+
+  <div class="audit-stack">
+    <section class="card table-card audit-section" aria-labelledby="deterministic-heading">
+      <div class="table-heading">
+        <div>
+          <h2 id="deterministic-heading">Deterministic findings</h2>
+          <p class="muted">These findings govern application safety decisions.</p>
+        </div>
+        <span>{{ deterministic_rows|length }} current</span>
+      </div>
+      {% if deterministic_rows %}
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Severity</th>
+                <th>Code</th>
+                <th>Hardware</th>
+                <th>Source ID</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in deterministic_rows %}
+                <tr>
+                  <td><span class="finding-badge finding-{{ row.severity }}">{{ row.severity }}</span></td>
+                  <td><strong>{{ row.code }}</strong></td>
+                  <td class="hardware-name"><a href="/hardware/{{ row.hardware_id }}">{{ row.hardware_name }}</a></td>
+                  <td>{{ row.source_id if row.source_id is not none else "—" }}</td>
+                  <td class="audit-message">{{ row.message }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="empty-state">No deterministic findings are active.</p>
+      {% endif %}
+    </section>
+
+    <section class="card audit-action-card" aria-labelledby="deepseek-heading">
+      <p class="eyebrow">Optional second opinion</p>
+      <h2 id="deepseek-heading">DeepSeek audit</h2>
+      <p class="muted">The model receives an allowlisted current snapshot. Free-text notes and legacy history are included because interpreting them is the feature; user records, secrets, raw payloads, source IDs, holders, and rental history are excluded.</p>
+      <form method="post" action="/admin/audit/llm">
+        <button class="button button-primary" type="submit"{% if not llm_configured %} disabled aria-disabled="true"{% endif %}>Request DeepSeek second opinion</button>
+      </form>
+      {% if not llm_configured %}
+        <p class="disabled-reason">Missing configuration: {{ missing_llm_settings|join(", ") }}.</p>
+      {% endif %}
+      {% if warning %}
+        <p class="alert audit-warning">{{ warning }}</p>
+      {% endif %}
+    </section>
+
+    {% if ai_rows is not none %}
+      <section class="card table-card audit-section" aria-labelledby="ai-heading">
+        <div class="table-heading">
+          <div>
+            <h2 id="ai-heading">AI suggestions — not operational decisions</h2>
+            <p class="muted">Suggestions are schema-validated and tied to submitted hardware IDs. They do not change deterministic findings.</p>
+          </div>
+          <span>{{ ai_rows|length }} suggested</span>
+        </div>
+        {% if ai_rows %}
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Suggested severity</th>
+                  <th>Hardware</th>
+                  <th>Explanation</th>
+                  <th>Recommendation</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in ai_rows %}
+                  <tr>
+                    <td><span class="finding-badge ai-finding">{{ row.severity }}</span></td>
+                    <td class="hardware-name"><a href="/hardware/{{ row.hardware_id }}">{{ row.hardware_name }}</a></td>
+                    <td class="audit-message">{{ row.explanation }}</td>
+                    <td class="audit-recommendation">{{ row.recommendation }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="empty-state">DeepSeek returned no AI suggestions for this snapshot.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+  </div>
+{% endblock %}

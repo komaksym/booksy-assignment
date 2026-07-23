@@ -10,8 +10,18 @@ from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.sessions import SessionMiddleware
 
+from hardware_hub.audit import (
+    AuditUnavailableError,
+    LLMFinding,
+    build_ai_rows,
+    build_audit_snapshot,
+    build_deterministic_rows,
+    llm_configuration_status,
+    request_deepseek_audit,
+)
 from hardware_hub.auth import (
     UserInputError,
     authenticate,
@@ -347,6 +357,32 @@ def _detail_response(
     )
 
 
+def _audit_context(
+    *,
+    user: dict[str, Any],
+    records: list[dict[str, Any]],
+    findings: tuple[Finding, ...],
+    runtime: Settings,
+    ai_findings: tuple[LLMFinding, ...] | None,
+    warning: str | None,
+) -> dict[str, Any]:
+    """Build a fully validated, read-only audit-page presentation model."""
+
+    configured, missing = llm_configuration_status(
+        runtime.llm_base_url,
+        runtime.llm_api_key,
+        runtime.llm_model,
+    )
+    return {
+        "user": user,
+        "deterministic_rows": build_deterministic_rows(records, findings),
+        "llm_configured": configured,
+        "missing_llm_settings": missing,
+        "warning": warning,
+        "ai_rows": None if ai_findings is None else build_ai_rows(records, ai_findings),
+    }
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Create a configured Hardware Hub application."""
 
@@ -530,6 +566,81 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/hardware/{internal_id}/return")
     async def return_item(request: Request, internal_id: str):
         return await rental_transition(request, internal_id, action="return")
+
+    @app.get("/admin/audit", response_class=HTMLResponse)
+    async def admin_audit(request: Request):
+        user = current_user(request)
+        if user is None:
+            return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+        if user["role"] != "admin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        records = request.app.state.hardware.all()
+        findings = find_issues(records, date.today())
+        return _TEMPLATES.TemplateResponse(
+            request=request,
+            name="audit.html",
+            context=_audit_context(
+                user=user,
+                records=records,
+                findings=findings,
+                runtime=runtime,
+                ai_findings=None,
+                warning=None,
+            ),
+        )
+
+    @app.post("/admin/audit/llm", response_class=HTMLResponse)
+    async def admin_llm_audit(request: Request):
+        user = current_user(request)
+        if user is None:
+            return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+        if user["role"] != "admin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+
+        records = request.app.state.hardware.all()
+        findings = find_issues(records, date.today())
+        configured, missing = llm_configuration_status(
+            runtime.llm_base_url,
+            runtime.llm_api_key,
+            runtime.llm_model,
+        )
+        ai_findings = None
+        warning = None
+        if not configured:
+            warning = (
+                "DeepSeek audit is unavailable until "
+                f"{', '.join(missing)} are configured. "
+                "Deterministic findings remain complete."
+            )
+        else:
+            snapshot = build_audit_snapshot(records, findings)
+            try:
+                ai_findings = await run_in_threadpool(
+                    request_deepseek_audit,
+                    snapshot,
+                    base_url=runtime.llm_base_url,
+                    api_key=runtime.llm_api_key,
+                    model=runtime.llm_model,
+                    transport=getattr(request.app.state, "llm_transport", None),
+                )
+            except AuditUnavailableError:
+                warning = (
+                    "DeepSeek audit was unavailable or invalid. "
+                    "Deterministic findings remain complete."
+                )
+
+        return _TEMPLATES.TemplateResponse(
+            request=request,
+            name="audit.html",
+            context=_audit_context(
+                user=user,
+                records=records,
+                findings=findings,
+                runtime=runtime,
+                ai_findings=ai_findings,
+                warning=warning,
+            ),
+        )
 
     @app.get("/admin/users", response_class=HTMLResponse)
     async def admin_users(request: Request):
