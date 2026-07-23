@@ -243,7 +243,9 @@ source `10` correction, one safe rent/return, the deterministic audit, one real 
 request when a funded key is supplied, and persistence of a known data change across one
 redeploy.
 
-**Live verification status:** no public Railway URL, real DeepSeek result, or redeploy
-persistence result is recorded in this repository state. Those checks require the
-user-controlled Railway project and sealed secrets. Add a URL and success claims only
-after they are actually verified.
+**Live verification status:** verified on
+`https://booksy-assignment-production.up.railway.app`. `/health`, bootstrap login, user
+creation, the 11-record inventory, source `10` correction, safe rent/return,
+deterministic audit, and one real DeepSeek response passed. The known canonical
+correction, created user, and rental history remained present after one redeploy,
+confirming the `/data` volume mount.

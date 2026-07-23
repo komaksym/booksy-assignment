@@ -29,7 +29,7 @@ The executable plan lives in
 | 1 | `codex/01-shell-auth` | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | Merged |
 | 2 | `codex/02-dirty-inventory` | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Merged |
 | 3 | `codex/03-rental` | Guarded rent/return flow with ownership and visible history | Merged |
-| 4 | `codex/04-audit-release` | Deterministic/DeepSeek audit, honest documentation, and one-worker Railway release | Completion validation in progress; live access and secrets still required |
+| 4 | `codex/04-audit-release` | Deterministic/DeepSeek audit, honest documentation, and one-worker Railway release | Live verification complete; PR ready for final review |
 
 No implementation duration, estimate, or timebox is part of this roadmap. Agents
 work until the slice definition of done is satisfied and the PR is ready for
@@ -113,7 +113,7 @@ These omissions are documented assessment trade-offs, not accidental gaps.
 ## Release Boundary
 
 The user approved the detailed Slice 4 implementation specification. The code and
-one-worker Railway contract can be completed on the review branch, but public
-verification still requires the user-controlled Railway project, volume, funded
-DeepSeek key, and sealed secrets. No URL or live success claim is recorded before
+one-worker Railway contract are complete on the review branch. Public verification
+passed against the user-controlled Railway project and mounted volume with a funded
+DeepSeek key and sealed secrets. No URL or live success claim is recorded before
 those checks actually pass.
