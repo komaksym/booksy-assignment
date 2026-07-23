@@ -3,6 +3,7 @@ import json
 import time
 
 import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -58,6 +59,7 @@ def test_deepseek_trickle_response_obeys_total_deadline(
     client: TestClient,
     app: FastAPI,
     settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     login = client.post(
         "/login",
@@ -72,7 +74,7 @@ def test_deepseek_trickle_response_obeys_total_deadline(
     app.state.settings.llm_base_url = "https://api.deepseek.test/v1/"
     app.state.settings.llm_model = "deepseek-v4-flash"
     app.state.settings.llm_api_key = "test-deepseek-key"
-    app.state.llm_total_timeout_seconds = 0.05
+    monkeypatch.setattr("hardware_hub.audit._TOTAL_TIMEOUT_SECONDS", 0.05)
     provider_body = json.dumps(
         {
             "choices": [
