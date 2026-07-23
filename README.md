@@ -1,50 +1,62 @@
 # Hardware Hub
 
-Hardware Hub is a focused internal hardware-management product for Booksy's
-AI-Native recruitment assessment. It preserves the supplied malformed inventory as
-immutable evidence, derives trusted canonical fields for operations, blocks
-objectively unsafe rentals, and gives administrators a read-only deterministic and
-optional DeepSeek audit.
+**Live demo:** https://booksy-assignment-production.up.railway.app  
+**AI development log:** [`docs/ai-development-log.md`](docs/ai-development-log.md)  
+**Architecture and prompt trail:** [`PLANS.md`](PLANS.md)
 
-The project deliberately favors a complete, reviewable vertical journey over
-production infrastructure. FastAPI renders Jinja pages, TinyDB stores one JSON file,
-and deterministic rules remain authoritative even when the model is missing, fails,
-or returns invalid output.
+> Reviewer credentials are shared privately and are not committed to the repository.
 
-## Prerequisites
+<img src="docs/assets/slice-4-audit-desktop.png" alt="Hardware Hub administrator audit" width="900">
 
-- Python 3.12
-- [`uv`](https://docs.astral.sh/uv/)
+Hardware Hub is a focused internal equipment-management application built for Booksy's AI-Native recruitment assessment. It preserves the supplied malformed inventory as immutable evidence, derives trusted canonical fields for operations, blocks objectively unsafe rentals, and provides an administrator-only deterministic and optional DeepSeek inventory audit.
+
+## Assessment coverage
+
+| Requirement | Delivered behavior |
+| --- | --- |
+| Management engine | Administrator-created accounts, login, role enforcement, hardware create/edit/delete, and repair transitions. |
+| Smart dashboard | Name, brand, purchase date, status, server-side filtering and sorting, and anomaly visibility. |
+| Rental engine | Guarded rent, owner-only return, administrator release, and append-only attributable history. |
+| AI-native layer | Authoritative deterministic inventory rules plus an optional read-only DeepSeek second opinion. |
+| Initial data | All 11 supplied records survive, including duplicate IDs and malformed values. |
+| Testing | Authentication, import, correction, rental, privacy, provider fallback, deadline, and non-mutation journeys are automated. |
+| Deployment | Verified Railway deployment with a persistent `/data` volume and one Uvicorn worker. |
+
+## Stack choice
+
+The assessment permits alternatives when they improve productivity. This implementation uses **Python 3.12, FastAPI, Jinja, TinyDB, and minimal browser JavaScript** instead of a separate Vue frontend.
+
+For this bounded MVP, server-rendered pages keep authentication, authorization, validation, and state transitions inside one testable Python boundary. The supplied wireframes were used as inspiration rather than copied: canonical operational fields are separated from immutable source evidence, ordinary users receive a simpler circulation view, and AI suggestions are visually separated from authoritative deterministic findings.
 
 ## Local setup
 
+Prerequisites: Python 3.12 and [`uv`](https://docs.astral.sh/uv/).
+
 ```bash
 cp .env.example .env
-# Replace every example credential and secret.
+# Replace all example credentials and secrets.
 uv sync --locked
 uv run uvicorn --app-dir src hardware_hub.app:app --reload
 ```
 
-Open `http://127.0.0.1:8000/login`. On the first startup, the application creates the
-bootstrap administrator only when no administrator already exists and imports the
-11-record seed only when the persistent initialization marker is absent.
+Open `http://127.0.0.1:8000/login`.
+
+On first startup, the application creates the bootstrap administrator only when no administrator exists and imports the seed only when the persistent initialization marker is absent.
 
 ## Environment variables
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `ENVIRONMENT` | yes | `development`, `test`, or `production`; production enables the Secure session-cookie flag. |
-| `TINYDB_PATH` | yes | JSON database path. Use `/data/hardware-hub.json` on the Railway volume. |
-| `SESSION_SECRET` | yes | At least 16 characters; use a long random secret outside local development. |
-| `BOOTSTRAP_ADMIN_EMAIL` | yes | Email for the first idempotently created administrator. |
+| `ENVIRONMENT` | yes | `development`, `test`, or `production`; production enables Secure cookies. |
+| `TINYDB_PATH` | yes | Database path; use `/data/hardware-hub.json` on Railway. |
+| `SESSION_SECRET` | yes | Session-signing secret. |
+| `BOOTSTRAP_ADMIN_EMAIL` | yes | Initial administrator email. |
 | `BOOTSTRAP_ADMIN_PASSWORD` | yes | Initial administrator password. |
-| `LLM_BASE_URL` | optional | OpenAI-compatible DeepSeek base URL, for example `https://api.deepseek.com`. |
-| `LLM_MODEL` | optional | Configurable model; the example configuration uses `deepseek-v4-flash`. |
-| `LLM_API_KEY` | optional | DeepSeek bearer token. Keep it out of source control and browser output. |
+| `LLM_BASE_URL` | optional | OpenAI-compatible provider base URL. |
+| `LLM_MODEL` | optional | Provider model name. |
+| `LLM_API_KEY` | optional | Provider bearer token. |
 
-All three LLM variables must be non-blank before the browser action is enabled.
-Without them, deterministic auditing remains fully available and a forged direct POST
-returns a safe warning without making a network request.
+All three LLM values must be non-blank before the browser action is enabled. Deterministic auditing remains available without them.
 
 ## Validation
 
@@ -57,195 +69,66 @@ uv run pytest -q
 uv build
 ```
 
-The committed implementation is created only after the test-first audit scenario,
-full pytest suite, Ruff checks, lockfile check, package build, and diff check pass in
-the one-time branch workflow. Pull-request CI repeats the repository's minimal gate.
-The package includes the Jinja templates, CSS, and exact JSON seed required at runtime.
-
 ## Manual product journey
 
-1. Log in with the bootstrap administrator and create an ordinary user under **Users**.
-2. Inspect the inventory as the administrator. Confirm all 11 source records survive,
-   both source-ID `4` rows have distinct internal identities, source `10` exposes its
-   malformed original values beside unset canonical values, and the legacy assignee
-   is shown only as present and redacted.
-3. Correct source `10` with a canonical brand, purchase date, and status. Its three
-   repairable findings clear while the immutable raw payload remains unchanged.
-4. Log in as the ordinary user. Rent a safe available item, verify another user cannot
-   return it, then return it as the owner and inspect the append-only history.
-5. Log back in as administrator and open **Audit**. Review the deterministic table.
-   Configure the optional LLM variables to request a separate DeepSeek second opinion.
+1. Log in as the bootstrap administrator and create an ordinary user.
+2. Inspect all 11 imported records, including both source-ID `4` rows and the malformed source `10` record.
+3. Correct source `10`; its repairable findings clear while the immutable source payload remains unchanged.
+4. Log in as the ordinary user, rent a safe available item, and return it as the owner.
+5. Log back in as administrator and review deterministic and optional DeepSeek audit results.
 
-## Implemented behavior by slice
+## ✅ Fully implemented
 
-### Slice 1 — shell and access
+- Administrator-only account creation and authenticated role enforcement.
+- Hardware create, edit, hard delete, and repair transitions.
+- Lossless import of all supplied source records under generated internal IDs.
+- Immutable source evidence beside editable canonical fields.
+- Server-side inventory sorting and filtering.
+- Guarded ordinary-user rent and owner-only return transitions.
+- Administrator release of held hardware with attributable history.
+- Deterministic inventory findings that remain the only operational safety authority.
+- Optional read-only DeepSeek audit using an allowlisted snapshot, strict schema validation, atomic fallback, and a ten-second total wall-clock deadline.
+- Railway deployment with one worker and persistent TinyDB storage.
 
-- Public `/health` endpoint and FastAPI/Jinja application shell.
-- Idempotent bootstrap administrator, Argon2 password hashing, and administrator-created
-  ordinary users; there is no public registration.
-- Signed session cookie containing only `user_id`, with an eight-hour absolute maximum,
-  `HttpOnly`, `SameSite=Strict`, and `Secure` in production.
-- Active-user reload and server-side role enforcement on every request.
+## ⚡ Shortcuts & hacks
 
-### Slice 2 — dirty inventory
+- **Signed cookie instead of persisted sessions or SSO.** Acceptable for the MVP; production needs central revocation and company identity integration.
+- **No synchronizer CSRF token.** Strict same-site cookies and POST-only mutations bound the assessment scope; production needs complete CSRF protection.
+- **TinyDB with one worker and replica.** Portable and easy to review; production needs a transactional relational database.
+- **Initialization marker instead of migrations.** Prevents duplicate seed imports and deleted-row resurrection; production needs explicit schema migrations.
+- **Permanent hard deletion.** Meets the assessment requirement but lacks recovery and deletion audit history.
+- **One provider call and schema.** No retries, streaming, background jobs, stored runs, or general LLM gateway.
+- **Manual browser and deployment smoke tests.** No automated end-to-end or deployment test suite.
 
-- Lossless, idempotent import of every supplied object under a generated internal UUID.
-- Immutable `raw_payload` beside editable canonical fields.
-- Eight deterministic rule codes and the exact 11 initial finding occurrences.
-- Server-side filtering/sorting, administrator CRUD and repair transitions, canonical
-  correction, ordinary-user concealment of canonical-null rows, and legacy email
-  redaction at render time.
+## ⚠️ Partial / missing
 
-### Slice 3 — guarded circulation
-
-- Ordinary-user-only rent and owner-only return POST routes.
-- Fresh state checks for canonical availability, null holder, and deterministic critical
-  findings; warnings do not block rental and returns are not finding-gated.
-- One coherent TinyDB update per accepted transition and zero writes on rejection.
-- Append-only rental/release history with role-safe actor labels.
-- A bounded administrator edit override can release an application-held item to
-  `Available` or `Repair` with attributable history.
-
-### Slice 4 — audit and release handoff
-
-- Administrator-only `GET /admin/audit` and `POST /admin/audit/llm` routes.
-- Fresh deterministic findings rendered in a stable global table with hardware links.
-- One allowlisted snapshot containing every current hardware document, including
-  canonical-null records, but excluding raw payloads, source IDs, users, emails,
-  passwords, sessions, secrets, holders, rental history, and timestamps.
-- One direct ten-second HTTPX chat-completions call with JSON output, thinking disabled,
-  strict Pydantic schemas, atomic rejection, submitted-ID validation, and no retries.
-- Provider/configuration/JSON/schema/unknown-ID failures preserve the complete
-  deterministic result and leave inventory byte-for-byte equivalent at the document
-  level.
-- AI suggestions render separately and never mutate or govern operational state.
-- One-worker Railway configuration and a documented `/data` persistence contract.
-
-## Data strategy
-
-The malformed fixture is product input, not setup noise. Each source object is retained
-as a JSON value-equivalent deep copy in `raw_payload`; key order and whitespace are not
-meaningful, but values are never silently corrected. The supplied ID is provenance only
-and is never used as application identity, update key, or deduplication key.
-
-Canonical fields are the editable operational view. Unsupported dates/statuses become
-canonical nulls while the original value remains visible to administrators. Findings
-are derived on every request by `find_issues`; they are not stored or acknowledged.
-This makes corrections observable without erasing evidence.
-
-The model snapshot is a separate explicit projection. It includes canonical fields,
-editable notes/history, a boolean indicating legacy-assignee presence, and only the
-code/severity of deterministic findings. Notes/history are intentionally included
-because interpreting them is the feature.
-
-## Security, privacy, and authority boundaries
-
-- The signed cookie is tamper-evident, not encrypted or centrally revocable.
-- `SameSite=Strict` and POST-only mutations reduce cross-site request risk but are not a
-  complete CSRF defense.
-- The source `assignedTo` email is never rendered or sent to the model.
-- Free-text notes/history may still contain personal data or instruction-like content.
-  The prompt labels all snapshot content untrusted, the model has no tools or write path,
-  and output is schema-validated, but hardened redaction and prompt-injection defenses
-  are outside this MVP.
-- Deterministic findings alone control rental safety. Model severity is presentation
-  metadata only: an AI `critical` suggestion cannot block a rental, and an omitted
-  deterministic critical finding cannot unblock one.
-- Provider bodies, stack traces, raw exceptions, credentials, request snapshots, and
-  free-text content are not shown in browser warnings or intentionally logged.
-
-## Deliberate shortcuts and why
-
-- **Signed cookie instead of persisted sessions or SSO:** small and sufficient for the
-  assessment; production needs central revocation and identity integration.
-- **No synchronizer CSRF tokens:** strict same-site cookies plus POST-only mutations keep
-  the implementation bounded; production needs complete CSRF protection.
-- **TinyDB with one worker/replica:** keeps the full project understandable; it does not
-  provide transactional multi-process writes. Production should use a relational DB.
-- **Persistent initialization marker instead of migrations:** prevents duplicate import
-  and deleted-row resurrection; production needs schema migrations.
-- **Permanent hard deletion:** directly satisfies the assignment but has no recovery or
-  deletion audit trail.
-- **One LLM schema and provider call:** enough to demonstrate safe optional AI value;
-  there are no retries, streaming, background jobs, model adapters, or stored runs.
-- **Manual browser/release verification instead of automated E2E/deployment tests:** the
-  repository stays focused on five high-value integration behaviors.
-- **No automated backups or runtime `/data` guard:** Railway storage correctness depends
-  on the documented volume configuration and operator checks.
-
-## Partial or missing work
-
-- Public registration, invitations, password reset/change, session revocation UI, and SSO.
-- Pagination, notifications, due dates, reassignment, rental limits, and user-facing audit.
-- Finding acknowledgement/history, automatic repair, AI writes, tools, agents, RAG, and
-  persisted audit runs.
-- Transactional concurrency, multiple workers/replicas, backup automation, and migrations.
-- Hardened free-text redaction, moderation, prompt-injection detection, byte limits, and
-  a general LLM gateway.
+- Public registration, invitations, password reset/change, session revocation, and SSO.
+- Pagination, notifications, due dates, reassignment, rental limits, and user-facing audits.
+- Finding acknowledgement/history, automatic repair, AI writes, agents, RAG, and persisted audit runs.
+- Multi-worker transactional concurrency, migrations, backups, and automated recovery.
+- Hardened free-text redaction, moderation, prompt-injection detection, and request/response size limits.
 - Automated browser, load, deployment, and redeploy-persistence tests.
 
-## Top three improvements with another 24 hours
+## 🔮 Next steps — another 24 hours
 
-1. Replace TinyDB with PostgreSQL transactions and explicit migrations, preserving the
-   raw/canonical model and transition invariants.
-2. Add centrally revocable company authentication plus full CSRF protection and an
-   administrator deletion/audit trail.
-3. Add a hardened LLM privacy boundary with redaction, request/response size limits,
-   structured observability, and automated browser/deployment smoke coverage.
+1. Replace TinyDB with PostgreSQL transactions and explicit migrations while preserving the raw/canonical model.
+2. Add centrally revocable company authentication, complete CSRF protection, and administrator deletion history.
+3. Harden the LLM privacy boundary with redaction, size limits, structured observability, and automated browser/deployment checks.
 
 ## AI development disclosure
 
-ChatGPT/Codex assisted with repository exploration, design criticism, implementation,
-test generation, review, and documentation. Every accepted change was constrained by
-the checked-in specifications, inspected as a diff, and required deterministic tests
-and CI before being presented as complete.
+ChatGPT/Codex assisted with repository exploration, design criticism, implementation, test generation, review, and documentation. Every accepted change was constrained by checked-in specifications, inspected as a diff, and required deterministic tests and CI before handoff.
 
-Representative prompt trail:
-
-1. Preserve every malformed source object while defining separate canonical fields and
-   deterministic findings; do not silently repair or key by source ID.
-2. Implement ordinary-user rent/owner-return transitions with fresh reads, one coherent
-   update, no-write rejection, and privacy-aware history.
-3. Review the rental PR independently, treat review questions as possible real defects,
-   and patch held-item recovery, return-after-new-safety-evidence, role-scoped filters,
-   and oversized tests.
-4. Implement the approved Slice 4 specification test-first: a read-only deterministic
-   audit plus an optional allowlisted DeepSeek second opinion with strict atomic fallback.
-
-Corrections made after review include the bounded administrator held-item release, the
-safety-handoff regression, ordinary-user concealment of the correction-only status
-filter, splitting the rental acceptance test into focused journeys, and making every
-invalid model response discard all AI rows rather than presenting partial output.
-The longer development log is retained in [`docs/ai-development-log.md`](docs/ai-development-log.md).
+The full tooling, data strategy, prompt trail, and concrete corrections are documented in [`docs/ai-development-log.md`](docs/ai-development-log.md).
 
 ## Railway deployment
 
-`railway.toml` defines one Railpack service with this start command:
+`railway.toml` runs one Uvicorn worker:
 
 ```text
 uv run uvicorn --app-dir src hardware_hub.app:app --host 0.0.0.0 --port $PORT --workers 1
 ```
 
-Configure Railway with:
+Configure one replica, mount a persistent volume at `/data`, set `TINYDB_PATH=/data/hardware-hub.json`, provide sealed authentication secrets, and optionally configure the three LLM variables.
 
-- one service, one replica;
-- a persistent volume mounted at `/data`;
-- `TINYDB_PATH=/data/hardware-hub.json`;
-- `ENVIRONMENT=production`;
-- sealed `SESSION_SECRET`, `BOOTSTRAP_ADMIN_EMAIL`, and
-  `BOOTSTRAP_ADMIN_PASSWORD` values;
-- optional sealed `LLM_API_KEY`, plus `LLM_BASE_URL=https://api.deepseek.com` and
-  `LLM_MODEL=deepseek-v4-flash`; and
-- `/health` as the health-check path.
-
-After publication, verify `/health`, bootstrap login, user creation, all 11 dirty rows,
-source `10` correction, one safe rent/return, the deterministic audit, one real DeepSeek
-request when a funded key is supplied, and persistence of a known data change across one
-redeploy.
-
-**Live verification status:** verified on
-`https://booksy-assignment-production.up.railway.app`. `/health`, bootstrap login, user
-creation, the 11-record inventory, source `10` correction, safe rent/return,
-deterministic audit, and one real DeepSeek response passed. The known canonical
-correction, created user, and rental history remained present after one redeploy,
-confirming the `/data` volume mount.
+**Live verification:** `/health`, bootstrap login, user creation, all 11 records, source `10` correction, rent/return, deterministic audit, a real DeepSeek response, and persistence across one redeploy were manually verified.
