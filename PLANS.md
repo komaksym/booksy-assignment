@@ -2,9 +2,9 @@
 
 ## Delivery Principle
 
-Ship a complete vertical product and make the malformed seed the centerpiece of
-the engineering story. Architecture exists only to keep the code understandable
-for four small pull requests; explicit shortcuts are preferable to unfinished
+Ship a complete vertical product and make the malformed seed the centerpiece of the
+engineering story. Architecture exists only to keep the code understandable for four
+small feature pull requests; explicit shortcuts are preferable to unfinished
 infrastructure.
 
 The executable plan lives in
@@ -18,9 +18,7 @@ The executable plan lives in
 - [Slice 3 implementation plan](docs/superpowers/plans/2026-07-22-slice-3-safe-rental-implementation.md) — test-first task sequence for the approved rental design.
 - [Slice 4 audit/release specification](docs/superpowers/specs/2026-07-23-slice-4-audit-release-design.md) — approved deterministic/DeepSeek audit and verified-release contract.
 - [Slice 4 audit/release completion plan](docs/superpowers/plans/2026-07-23-slice-4-audit-release-implementation.md) — acceptance, browser evidence, real DeepSeek, Railway persistence, and final-review sequence.
-- [Reference UI mockup](docs/assets/hardware-hub-reference-ui.png) — visual
-  direction for Slice 1's shell and Slice 2's dashboard/admin screens. It is a
-  styling and layout reference, not an expansion of the MVP feature scope.
+- [Reference UI mockup](docs/assets/hardware-hub-reference-ui.png) — visual direction for Slice 1's shell and Slice 2's dashboard/admin screens. It is a styling and layout reference, not an expansion of the MVP feature scope.
 
 ## Pull Request Sequence
 
@@ -29,11 +27,14 @@ The executable plan lives in
 | 1 | `codex/01-shell-auth` | Runnable app, visual foundation, signed-cookie login, admin-created users, health check, and minimal CI | Merged |
 | 2 | `codex/02-dirty-inventory` | All eleven records preserved, anomalies visible, dashboard working, and admin CRUD complete | Merged |
 | 3 | `codex/03-rental` | Guarded rent/return flow with ownership and visible history | Merged |
-| 4 | `codex/04-audit-release` | Deterministic/DeepSeek audit, honest documentation, and one-worker Railway release | Live verification complete; PR ready for final review |
+| 4 | `codex/04-audit-release` | Deterministic/DeepSeek audit, honest documentation, and one-worker Railway release | Implementation and live verification complete; PR #4 awaiting merge |
 
-No implementation duration, estimate, or timebox is part of this roadmap. Agents
-work until the slice definition of done is satisfied and the PR is ready for
-review; elapsed time must not be used to skip validation or narrow the contract.
+The delivery handoff is a separate documentation and release-gate PR rather than a fifth
+product slice. It does not expand runtime behavior.
+
+No implementation duration, estimate, or timebox is part of this roadmap. Agents work
+until the slice definition of done is satisfied and the PR is ready for review; elapsed
+time must not be used to skip validation or narrow the contract.
 
 ```mermaid
 flowchart LR
@@ -44,57 +45,59 @@ flowchart LR
 
 ## Mandatory Slice Workflow
 
-Each slice still uses sub-agents, but orchestration must not become its own
-project:
+Each slice still uses sub-agents, but orchestration must not become its own project:
 
 1. Start the branch from reviewed and merged `main`.
 2. Give at least one implementation sub-agent a bounded feature or test task.
 3. Use a fresh read-only sub-agent for one specification/quality review.
 4. Parallelize only clearly disjoint files; the root agent owns integration.
-5. Run the minimal gate, perform the slice's manual smoke check, and open one PR
-   with a small Mermaid DAG.
+5. Run the complete gate, perform the slice's manual smoke check, and open one PR with a
+   small Mermaid DAG.
 6. Stop for user review before starting the next branch.
 
 Sub-agents do not commit, push, or open PRs from the shared worktree.
 
-## Minimal CI
+## CI gate
 
 One Ubuntu job runs on pull requests and pushes to `main`:
 
 ```text
+uv lock --check
 uv sync --locked
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest -q
+uv build
 ```
 
-There is no matrix, coverage service, mypy job, package-build job, Playwright,
-preview environment, or deployment automation.
+There is no matrix, coverage service, mypy job, Playwright, preview environment, or
+deployment automation.
 
 ## Five Automated Tests That Matter
 
-1. An admin creates a user; both can log in, while the ordinary user is denied an
-   admin mutation.
-2. All eleven source records survive idempotent loading; both duplicate IDs and
-   the exact deterministic findings remain visible.
-3. Canonical admin correction of source `10` clears its three repairable findings
-   without rewriting the preserved raw source; unauthorized writes fail.
-4. One unsafe item is blocked; a safe item completes the owner-only rent/return
-   journey with history.
-5. One LLM provider failure leaves deterministic audit results and inventory
-   intact.
+1. An admin creates a user; both can log in, while the ordinary user is denied an admin
+   mutation.
+2. All eleven source records survive idempotent loading; both duplicate IDs and the exact
+   deterministic findings remain visible.
+3. Canonical admin correction of source `10` clears its three repairable findings without
+   rewriting the preserved raw source; unauthorized writes fail.
+4. One unsafe item is blocked; a safe item completes the owner-only rent/return journey
+   with history.
+5. One LLM provider failure leaves deterministic audit results and inventory intact.
 
-Tests can contain several assertions around one behavior. The goal is evidence,
-not test-count inflation.
+Tests can contain several assertions around one behavior. The goal is evidence, not
+test-count inflation. Additional focused regressions protect privacy, malformed provider
+envelopes, event-loop responsiveness, and the total provider deadline.
 
 ## Definition of Done
 
 - The slice provides its advertised browser-visible behavior end to end.
 - The relevant automated test passes, along with the complete small suite.
+- Formatting, linting, lockfile verification, tests, and package build pass.
 - Desktop and narrow-width manual smoke checks pass for changed screens.
 - README and AI-development notes record actual shortcuts and corrections.
-- The PR describes what works, what was deliberately omitted, validation, and a
-  small dependency/data-flow DAG.
+- The PR describes what works, what was deliberately omitted, validation, and a small
+  dependency/data-flow DAG.
 - The next slice remains untouched until review and merge.
 
 ## Explicitly Removed From the Implementation Contract
@@ -103,7 +106,7 @@ not test-count inflation.
 - synchronizer CSRF tokens;
 - global mutation coordinators and concurrency stress harnesses;
 - a migration framework beyond idempotent first-run seed loading;
-- hardened LLM redaction, streaming, byte-limit, or deadline infrastructure;
+- hardened LLM redaction, streaming, byte-limit, or general gateway infrastructure;
 - runtime Railway volume-path guards and backup automation;
 - automated browser testing;
 - broad unit coverage for every helper or failure category.
@@ -113,7 +116,8 @@ These omissions are documented assessment trade-offs, not accidental gaps.
 ## Release Boundary
 
 The user approved the detailed Slice 4 implementation specification. The code and
-one-worker Railway contract are complete on the review branch. Public verification
-passed against the user-controlled Railway project and mounted volume with a funded
-DeepSeek key and sealed secrets. No URL or live success claim is recorded before
-those checks actually pass.
+one-worker Railway contract are complete on the review branch. Public verification passed
+against the user-controlled Railway project and mounted volume with a funded DeepSeek key
+and sealed secrets. No URL or live success claim was recorded before those checks actually
+passed. The final delivery PR only improves reviewer navigation, required disclosure, and
+the repository verification gate.
