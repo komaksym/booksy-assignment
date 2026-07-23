@@ -35,8 +35,7 @@ class _TrickleTransport(httpx.BaseTransport, httpx.AsyncBaseTransport):
     def __init__(self, body: bytes, *, chunk_count: int, delay_seconds: float) -> None:
         chunk_size = max(1, (len(body) + chunk_count - 1) // chunk_count)
         self._chunks = [
-            body[index : index + chunk_size]
-            for index in range(0, len(body), chunk_size)
+            body[index : index + chunk_size] for index in range(0, len(body), chunk_size)
         ]
         self._delay_seconds = delay_seconds
 
