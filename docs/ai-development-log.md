@@ -2,162 +2,136 @@
 
 ## Tooling
 
-ChatGPT was used to inspect the assignment, challenge scope, turn the agreed
-architecture into a review-gated plan, implement Slices 1 and 2 with test-first
-feedback, and review each bounded diff. GitHub tools handled repository operations. The
-implementation remains accountable to the checked-in specification and executable
-tests rather than generated prose.
+ChatGPT/Codex was used for assignment analysis, architecture criticism, implementation planning, test generation, bounded code changes, independent review, and delivery documentation. GitHub tools were used for repository and pull-request operations.
+
+The implementation was not accepted based on generated prose. Each slice was constrained by a checked-in specification, reviewed as a diff, and required executable validation before handoff.
 
 ## Data strategy
 
-The supplied hardware seed is intentionally malformed: it contains a duplicate
-source ID, invalid and missing values, future dates, unresolved assignments, and
-safety notes. Slice 2 preserves every raw object under a generated internal identity,
-derives visible findings, and stores corrections only in canonical fields.
+The supplied inventory is intentionally dirty and was treated as product input rather than setup noise. It includes:
 
-That avoids a common AI-generated migration failure: converting the list into a
-mapping keyed by source ID and losing one of the two records with ID `4`. A persistent
-initialization marker also prevents explicit deletion from accidentally resurrecting
-the fixture on restart.
+- duplicate source IDs;
+- invalid, missing, and future dates;
+- unsupported statuses;
+- misspelled or blank brands;
+- unresolved legacy assignments; and
+- safety-relevant notes and history.
+
+A naive AI-generated migration could convert the list into a dictionary keyed by source `id`, silently deleting one of the two records with ID `4`. The implemented strategy instead:
+
+1. assigns every imported object a generated internal UUID;
+2. stores the original object as immutable `raw_payload` evidence;
+3. derives editable canonical operational fields separately;
+4. treats the supplied ID only as provenance;
+5. recomputes deterministic findings rather than persisting resolution state; and
+6. uses a persistent initialization marker so deleting all inventory does not resurrect the seed on restart.
+
+The LLM receives a separate allowlisted projection. It includes canonical fields, editable notes/history, a legacy-assignee-presence boolean, and deterministic finding code/severity pairs. It excludes raw payloads, source IDs, users, emails, credentials, sessions, holders, rental history, and timestamps.
 
 ## Prompt trail
 
-The main instructions that shaped this slice were:
+The representative instructions that shaped the system were:
 
-1. Deliver the smallest complete, testable change and stop for human review.
-2. Prefer a signed user-ID cookie and explicit MVP trade-offs over a session subsystem.
-3. Prove one vertical journey: bootstrap administrator login → create ordinary user
-   → ordinary-user login → server-side administrator denial.
-4. Establish only the reusable visual shell; do not build a fake dashboard before
-   inventory exists.
-5. Run the same locked install, format, lint, and test commands locally and in CI.
-6. Preserve malformed values as evidence; never infer corrections such as changing
-   `Appel` or matching the legacy assignee email to an application user.
-7. Keep findings pure and transient, with exactly eight rule codes and 11 initial
-   row-level occurrences.
-8. Put authorization, validation, holder conflicts, and writes in Python; templates
-   receive precomputed presentation state only.
+1. Deliver the smallest complete, maintainable change and stop for review after each slice.
+2. Prefer a signed user-ID cookie and documented MVP trade-offs over a session subsystem.
+3. Prove one vertical authentication journey before building inventory behavior.
+4. Preserve every malformed source object; never silently repair values or key records by source ID.
+5. Keep deterministic findings pure and transient, with canonical corrections separate from source evidence.
+6. Put authorization, validation, holder conflicts, and writes in Python; templates receive presentation-ready state.
+7. Implement rent and return using fresh state, one coherent accepted update, and zero writes on rejection.
+8. Keep deterministic findings authoritative and make the LLM a read-only second opinion with no write path.
+9. Send only an explicit allowlisted inventory snapshot and reject malformed or out-of-scope model responses atomically.
+10. Review each PR independently and treat reviewer questions as possible real defects rather than merely answering them.
 
-The detailed decisions are preserved in:
+Detailed specifications and plans are stored under:
 
-- `docs/superpowers/specs/2026-07-22-slice-1-shell-auth-design.md`
-- `docs/superpowers/specs/2026-07-22-slice-2-dirty-inventory-design.md`
-- `docs/superpowers/plans/2026-07-22-hardware-hub-roadmap.md`
+- `docs/superpowers/specs/`
+- `docs/superpowers/plans/`
+- `PLANS.md`
 
-## Corrections
+## Development by slice
 
-An early generated settings model used Pydantic field-length validation for the
-session secret and bootstrap password. The resulting validation error included the
-rejected input value, which could expose a secret in startup logs. A failing
-regression test reproduced that leak. Validation was moved to explicit application
-and authentication helpers that raise concise errors without echoing credentials.
+### Slice 1 — shell and access
 
-The first `uv.lock` was assembled manually because package downloads were blocked
-inside the implementation sandbox. It passed a structural lock check but omitted
-registry artifact URLs and hashes, so a real `uv sync --locked` failed in CI. Once
-GitHub-hosted runners were available, the lockfile was deleted and regenerated by
-`uv` itself. The permanent read-only CI gate then passed locked installation, Ruff
-formatting, Ruff linting, and pytest.
+The first slice established the FastAPI/Jinja shell, bootstrap administrator, administrator-created ordinary users, Argon2 password hashing, signed sessions, login/logout, role checks, responsive UI foundation, and minimal CI.
 
-A separate correction protected the upcoming seed import: indexing records by their
-supplied `id` would overwrite one of the two records with ID `4`. The approved design
-instead assigns generated internal IDs and preserves raw rows losslessly. That
-behavior is now enforced by the Slice 2 integration test.
+### Slice 2 — dirty inventory
 
-The first Slice 2 draft treated an empty hardware table as an invitation to seed again.
-Independent review exposed that deleting every item would resurrect all 11 records on
-restart. The final implementation records first-run completion in the metadata table,
-backfills the marker when hardware already exists, and writes it only after one bulk
-insert succeeds.
+The second slice imported all 11 malformed objects losslessly, separated immutable source evidence from canonical fields, derived deterministic findings, and added dashboard filtering/sorting plus administrator hardware CRUD and repair transitions.
 
-The same review found that installed wheels would omit the JSON fixture unless package
-data changed. `data/*.json` is now explicitly packaged and the built wheel was checked
-before handoff.
+### Slice 3 — guarded rental
 
-Browser verification found no layout or redaction regression: the administrator saw
-both source-ID `4` edit links, source `7` rendered only the redacted legacy-assignee
-label, source `10` retained blank/null/Unknown evidence after correction, and the
-390-pixel layout kept horizontal overflow inside the table container.
+The third slice added ordinary-user rent, owner-only return, administrator release, append-only attributable history, privacy-aware actor labels, and safety guards that block unsafe rentals without blocking returns.
 
-## Slice 3 — guarded rental
+### Slice 4 — deterministic and DeepSeek audit
 
-The approved rental boundary is deliberately narrow: active ordinary users can rent
-multiple items concurrently, but only from a freshly read available and unheld state
-without critical findings. Warnings remain non-blocking. Only the current holder can
-return an item; returns are not finding-gated. Administrators retain traceability through resolved application-user emails and can
-release a held item only through the bounded edit override; they cannot use rent/return
-routes.
-Due dates are not part of this slice.
+The final product slice added an administrator-only deterministic audit and optional DeepSeek second opinion. The model has no tools or write route. Provider/configuration/deadline/JSON/schema/unknown-ID failures preserve the deterministic result and leave inventory unchanged.
 
-The work began with a test-first browser/storage journey, then review split the
-oversized scenario into focused role, rent, return, privacy, and safety-handoff tests
-with small shared helpers. Together they preserve the critical rejection, warning-only
-rental, repeated-action no-write behavior, owner-only return, administrator denial,
-append-only UTC history, and privacy-aware rendering assertions. Review corrections
-also scope status-filter choices by role, reject crafted ordinary-user correction
-filters, and prove that safety evidence added during a rental never blocks the owner
-return but immediately blocks the next rent.
+## Specific AI corrections
 
-Rental history is rendered newest first while the stored history remains append-only
-oldest first. Ordinary viewers see only `You` or `Another user`; administrators see
-resolved emails and `Unknown user` for a missing actor. Imported legacy assignee
-evidence remains unresolved and redacted. TinyDB is intentionally limited to a
-single-worker deployment: each accepted rent/return transition re-reads current state
-before its one TinyDB update, without a transaction or multi-worker guarantee.
+### Secret validation leaked rejected values
 
-The focused and full pytest runs retain the pre-existing FastAPI/Starlette TestClient
-deprecation warning. It is recorded as an existing dependency warning, not treated as
-new Slice 3 behavior or as validation failure.
+An early generated Pydantic settings model used field-length validation for the session secret and bootstrap password. The resulting startup error could include the rejected secret value in logs.
 
-## Slice 3 PR correction — administrator held-item release
+A regression reproduced the leak. Validation was moved to explicit application/authentication helpers that raise concise errors without echoing credentials.
 
-Review clarified that an administrator needs a bounded operational release for an
-application-held item without gaining access to ordinary rent/return routes. The
-existing administrator edit POST now accepts `Available` or `Repair` only when a
-fresh held record is canonically `In Use`. One full-record TinyDB update applies the
-validated metadata, clears the holder, appends an `admin_release` event attributed to
-the acting administrator, and reuses its UTC event timestamp as `updated_at`.
+### The first lockfile was hand-written and unusable
 
-Metadata-only edits keep a held item and its history untouched. Inconsistent held
-states are not normalized, deletion remains server-side rejected while held, and the
-edit page omits the active Delete POST form until the item is released. History uses
-the existing privacy policy: administrators see a resolved actor email, ordinary
-users see role-safe labels, and no page exposes a raw UUID.
+The initial `uv.lock` was assembled manually when package downloads were unavailable. It passed a structural check but omitted registry artifact URLs and hashes, so `uv sync --locked` failed in real CI.
 
-## Slice 4 — deterministic and DeepSeek audit
+The file was regenerated by `uv`, and CI then verified locked installation, formatting, linting, and tests.
 
-The Slice 4 implementation keeps one explicit authority boundary: `find_issues`
-produces the fresh deterministic findings that govern rental safety, while DeepSeek is
-an optional read-only second opinion. The model has no tools or write route, and its
-severity labels are presentation metadata only. Missing configuration, provider
-failure, malformed JSON, schema errors, incomplete completions, and unknown hardware
-IDs all preserve the complete deterministic result and leave every stored hardware
-document unchanged.
+### Duplicate source ID would have deleted data
 
-The model receives one allowlisted snapshot containing all current hardware records,
-including canonical-null rows. It includes canonical fields, editable notes and legacy
-history, a boolean legacy-assignee-presence signal, and deterministic finding
-code/severity pairs. It excludes raw payloads, source IDs, application users, emails,
-credentials, session data, holders, rental history, and timestamps. Free text is
-included deliberately because interpreting it is the feature, while the prompt marks
-all snapshot values as untrusted data.
+A dictionary keyed by the supplied source `id` would overwrite one of the two records with ID `4`. The design was corrected to use generated internal IDs and retain every raw object independently.
 
-The implementation began with failing access, fallback, privacy, valid-response,
-atomic-rejection, and non-mutation tests. A one-time remote runner then applied the
-production code and required locked dependencies, Ruff formatting and linting, the
-full pytest suite, a package build, and a clean diff before preserving the result.
-The normal pull-request CI subsequently passed on the exact code-review head.
+### Empty inventory would have re-seeded deleted records
 
-Independent follow-up review found that an unexpected provider envelope such as
-`{"choices": [null]}` could raise `AttributeError` before reaching the safe fallback.
-The parser now treats object-shape errors as invalid provider responses, and focused
-regressions cover both that envelope and a non-`stop` completion. No remaining Critical
-or Important code issue was found after the correction.
+The first import design treated an empty table as an uninitialized database. Independent review exposed that deleting every item would resurrect all 11 records after restart.
 
-The one-worker Railway release is live at
-`https://booksy-assignment-production.up.railway.app`. The authenticated product smoke,
-desktop and narrow screenshots, a funded DeepSeek response, and a manual redeploy all
-passed. The created user, corrected source `10`, and rental history survived that
-redeploy on the mounted `/data` volume. Final review then found that the synchronous
-provider client could block the single event loop, so the route now offloads that call
-and a concurrency regression proves `/health` remains responsive.
+A persistent initialization marker now distinguishes first startup from an intentionally empty inventory.
+
+### Package build omitted the JSON seed
+
+Review found that the installed wheel would not include the source fixture without explicit package-data configuration. `data/*.json` was added to package data, and the built wheel was checked.
+
+### Administrator could not release held hardware
+
+The initial rental specification excluded administrator forced return. Product clarification showed that administrators still needed a bounded recovery path.
+
+The edit transition now allows an administrator to move an application-held `In Use` item to `Available` or `Repair`, clear its holder, and append an attributable `admin_release` history event in one update.
+
+### Rental tests missed the safety handoff boundary
+
+The first acceptance test did not prove that new safety evidence added during a rental must not block the owner return but must block the next rental.
+
+A focused regression now proves that exact transition.
+
+### Invalid provider envelope escaped fallback
+
+A provider response such as `{"choices": [null]}` could raise `AttributeError` before reaching the safe fallback. The parser now treats unexpected object shapes as invalid provider responses, and focused tests cover this and non-stop completions.
+
+### HTTP timeout was not a total deadline
+
+The first implementation used `httpx.Timeout(10)`, which limits individual connect/read/write/pool inactivity periods but does not cap total wall-clock time. A provider could trickle chunks indefinitely while remaining below the per-read timeout.
+
+A slow-stream regression exposed the mismatch. The request now uses a cancellable asynchronous HTTP exchange under a real ten-second total deadline.
+
+## Verification approach
+
+Meaningful changes were checked narrowly first, then against the complete repository gate:
+
+```bash
+uv lock --check
+uv sync --locked
+uv run ruff format --check .
+uv run ruff check .
+uv run pytest -q
+uv build
+```
+
+Manual browser checks covered desktop and approximately 390-pixel widths. The deployed Railway application was also verified for health, login, user creation, all 11 records, canonical correction, rent/return, deterministic audit, a real DeepSeek response, and persistence after redeploy.
+
+## AI disclosure
+
+The repository contains AI-assisted work. The author remained responsible for scope, architecture, accepted changes, validation, deployment, and the final trade-offs documented in the README.
