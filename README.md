@@ -1,15 +1,54 @@
 # Hardware Hub
 
-Hardware Hub is a focused internal hardware-management product for Booksy's
-AI-Native recruitment assessment. It preserves the supplied malformed inventory as
-immutable evidence, derives trusted canonical fields for operations, blocks
-objectively unsafe rentals, and gives administrators a read-only deterministic and
-optional DeepSeek audit.
+**Live demo:** https://booksy-assignment-production.up.railway.app  
+**AI development log:** [`docs/ai-development-log.md`](docs/ai-development-log.md)  
+**Architecture and prompt trail:** [`PLANS.md`](PLANS.md)
 
-The project deliberately favors a complete, reviewable vertical journey over
-production infrastructure. FastAPI renders Jinja pages, TinyDB stores one JSON file,
-and deterministic rules remain authoritative even when the model is missing, fails,
-or returns invalid output.
+> The demo has no public credentials committed to the repository. Reviewer credentials
+> should be shared privately.
+
+<img src="docs/assets/slice-4-audit-desktop.png" alt="Hardware Hub administrator audit" width="900">
+
+Hardware Hub is a focused internal hardware-management product for Booksy's AI-Native
+recruitment assessment. It preserves the supplied malformed inventory as immutable
+evidence, derives trusted canonical fields for operations, blocks objectively unsafe
+rentals, and gives administrators a read-only deterministic and optional DeepSeek audit.
+
+The project deliberately favors a complete, reviewable vertical journey over production
+infrastructure. FastAPI renders Jinja pages, TinyDB stores one JSON file, and
+deterministic rules remain authoritative even when the model is missing, fails, times
+out, or returns invalid output.
+
+## Assessment coverage
+
+| Requirement | Delivered behavior |
+| --- | --- |
+| Management engine | Administrator-created accounts, login, role enforcement, hardware create/edit/delete, repair transitions, and a dedicated user-management view. |
+| Smart dashboard | Name, brand, purchase date, status, server-side filtering and sorting, anomaly visibility, and role-aware presentation. |
+| Rental engine | Ordinary-user rent, owner-only return, impossible-state guards, administrator release, and attributable append-only history. |
+| AI-native layer | Inventory auditor with authoritative deterministic rules plus an optional, read-only DeepSeek second opinion. |
+| Initial data | All 11 supplied records are preserved, including duplicate IDs and malformed values, under generated internal identities. |
+| Testing | Critical authentication, import, correction, rental, fallback, privacy, deadline, and non-mutation journeys are automated. |
+| Delivery | Locked dependencies, CI, comprehensive documentation, screenshots, and a verified Railway deployment with persistent storage. |
+
+## Stack and interface rationale
+
+The assessment permits alternatives when they improve productivity and results. This
+implementation uses **Python 3.12, FastAPI, Jinja, TinyDB, and minimal browser JavaScript**
+instead of adding a separate Vue application. For this bounded MVP, server-rendered pages
+keep authentication, authorization, validation, and business transitions in one testable
+Python boundary and avoid duplicating state between an API and a frontend client.
+
+The supplied wireframes were used as inspiration rather than copied. The interface is
+optimized for the actual engineering story:
+
+- canonical operational fields are visually separated from immutable source evidence;
+- source provenance and full findings are administrator-only, while ordinary users get a
+  simpler circulation view;
+- dense inventory information stays readable on desktop and scrolls within the table on
+  narrow screens; and
+- AI suggestions are deliberately separated from deterministic findings so their lower
+  authority is visible, not merely documented.
 
 ## Prerequisites
 
@@ -42,9 +81,9 @@ bootstrap administrator only when no administrator already exists and imports th
 | `LLM_MODEL` | optional | Configurable model; the example configuration uses `deepseek-v4-flash`. |
 | `LLM_API_KEY` | optional | DeepSeek bearer token. Keep it out of source control and browser output. |
 
-All three LLM variables must be non-blank before the browser action is enabled.
-Without them, deterministic auditing remains fully available and a forged direct POST
-returns a safe warning without making a network request.
+All three LLM variables must be non-blank before the browser action is enabled. Without
+them, deterministic auditing remains fully available and a forged direct POST returns a
+safe warning without making a network request.
 
 ## Validation
 
@@ -57,18 +96,18 @@ uv run pytest -q
 uv build
 ```
 
-The committed implementation is created only after the test-first audit scenario,
-full pytest suite, Ruff checks, lockfile check, package build, and diff check pass in
-the one-time branch workflow. Pull-request CI repeats the repository's minimal gate.
-The package includes the Jinja templates, CSS, and exact JSON seed required at runtime.
+The committed implementation is created only after the test-first audit scenario, full
+pytest suite, Ruff checks, lockfile check, package build, and diff check pass in the
+one-time branch workflow. Pull-request CI repeats the repository's minimal gate. The
+package includes the Jinja templates, CSS, and exact JSON seed required at runtime.
 
 ## Manual product journey
 
 1. Log in with the bootstrap administrator and create an ordinary user under **Users**.
 2. Inspect the inventory as the administrator. Confirm all 11 source records survive,
    both source-ID `4` rows have distinct internal identities, source `10` exposes its
-   malformed original values beside unset canonical values, and the legacy assignee
-   is shown only as present and redacted.
+   malformed original values beside unset canonical values, and the legacy assignee is
+   shown only as present and redacted.
 3. Correct source `10` with a canonical brand, purchase date, and status. Its three
    repairable findings clear while the immutable raw payload remains unchanged.
 4. Log in as the ordinary user. Rent a safe available item, verify another user cannot
@@ -76,7 +115,7 @@ The package includes the Jinja templates, CSS, and exact JSON seed required at r
 5. Log back in as administrator and open **Audit**. Review the deterministic table.
    Configure the optional LLM variables to request a separate DeepSeek second opinion.
 
-## Implemented behavior by slice
+## ✅ Fully implemented
 
 ### Slice 1 — shell and access
 
@@ -113,9 +152,10 @@ The package includes the Jinja templates, CSS, and exact JSON seed required at r
 - One allowlisted snapshot containing every current hardware document, including
   canonical-null records, but excluding raw payloads, source IDs, users, emails,
   passwords, sessions, secrets, holders, rental history, and timestamps.
-- One direct ten-second HTTPX chat-completions call with JSON output, thinking disabled,
-  strict Pydantic schemas, atomic rejection, submitted-ID validation, and no retries.
-- Provider/configuration/JSON/schema/unknown-ID failures preserve the complete
+- One cancellable HTTPX chat-completions request under a ten-second **total wall-clock
+  deadline**, with JSON output, thinking disabled, strict Pydantic schemas, atomic
+  rejection, submitted-ID validation, and no retries.
+- Provider/configuration/deadline/JSON/schema/unknown-ID failures preserve the complete
   deterministic result and leave inventory byte-for-byte equivalent at the document
   level.
 - AI suggestions render separately and never mutate or govern operational state.
@@ -129,14 +169,14 @@ meaningful, but values are never silently corrected. The supplied ID is provenan
 and is never used as application identity, update key, or deduplication key.
 
 Canonical fields are the editable operational view. Unsupported dates/statuses become
-canonical nulls while the original value remains visible to administrators. Findings
-are derived on every request by `find_issues`; they are not stored or acknowledged.
-This makes corrections observable without erasing evidence.
+canonical nulls while the original value remains visible to administrators. Findings are
+derived on every request by `find_issues`; they are not stored or acknowledged. This
+makes corrections observable without erasing evidence.
 
 The model snapshot is a separate explicit projection. It includes canonical fields,
 editable notes/history, a boolean indicating legacy-assignee presence, and only the
-code/severity of deterministic findings. Notes/history are intentionally included
-because interpreting them is the feature.
+code/severity of deterministic findings. Notes/history are intentionally included because
+interpreting them is the feature.
 
 ## Security, privacy, and authority boundaries
 
@@ -154,7 +194,7 @@ because interpreting them is the feature.
 - Provider bodies, stack traces, raw exceptions, credentials, request snapshots, and
   free-text content are not shown in browser warnings or intentionally logged.
 
-## Deliberate shortcuts and why
+## ⚡ Shortcuts & "hacks"
 
 - **Signed cookie instead of persisted sessions or SSO:** small and sufficient for the
   assessment; production needs central revocation and identity integration.
@@ -169,22 +209,22 @@ because interpreting them is the feature.
 - **One LLM schema and provider call:** enough to demonstrate safe optional AI value;
   there are no retries, streaming, background jobs, model adapters, or stored runs.
 - **Manual browser/release verification instead of automated E2E/deployment tests:** the
-  repository stays focused on five high-value integration behaviors.
+  repository stays focused on high-value integration behavior.
 - **No automated backups or runtime `/data` guard:** Railway storage correctness depends
   on the documented volume configuration and operator checks.
 
-## Partial or missing work
+## ⚠️ Partial / missing
 
 - Public registration, invitations, password reset/change, session revocation UI, and SSO.
 - Pagination, notifications, due dates, reassignment, rental limits, and user-facing audit.
 - Finding acknowledgement/history, automatic repair, AI writes, tools, agents, RAG, and
   persisted audit runs.
 - Transactional concurrency, multiple workers/replicas, backup automation, and migrations.
-- Hardened free-text redaction, moderation, prompt-injection detection, byte limits, and
-  a general LLM gateway.
+- Hardened free-text redaction, moderation, prompt-injection detection, byte limits, and a
+  general LLM gateway.
 - Automated browser, load, deployment, and redeploy-persistence tests.
 
-## Top three improvements with another 24 hours
+## 🔮 Next steps — 24-hour roadmap
 
 1. Replace TinyDB with PostgreSQL transactions and explicit migrations, preserving the
    raw/canonical model and transition invariants.
@@ -197,8 +237,8 @@ because interpreting them is the feature.
 
 ChatGPT/Codex assisted with repository exploration, design criticism, implementation,
 test generation, review, and documentation. Every accepted change was constrained by
-the checked-in specifications, inspected as a diff, and required deterministic tests
-and CI before being presented as complete.
+the checked-in specifications, inspected as a diff, and required deterministic tests and
+CI before being presented as complete.
 
 Representative prompt trail:
 
@@ -211,12 +251,17 @@ Representative prompt trail:
    and oversized tests.
 4. Implement the approved Slice 4 specification test-first: a read-only deterministic
    audit plus an optional allowlisted DeepSeek second opinion with strict atomic fallback.
+5. Stress-test the claimed provider deadline with a continuously trickling response and
+   replace the per-operation timeout with a real wall-clock deadline.
 
 Corrections made after review include the bounded administrator held-item release, the
-safety-handoff regression, ordinary-user concealment of the correction-only status
-filter, splitting the rental acceptance test into focused journeys, and making every
-invalid model response discard all AI rows rather than presenting partial output.
-The longer development log is retained in [`docs/ai-development-log.md`](docs/ai-development-log.md).
+safety-handoff regression, ordinary-user concealment of the correction-only status filter,
+splitting the rental acceptance test into focused journeys, making every invalid model
+response discard all AI rows, and replacing a misleading HTTP timeout guarantee with a
+cancellable total deadline.
+
+The full tooling, data strategy, prompt trail, and concrete AI corrections are documented
+in [`docs/ai-development-log.md`](docs/ai-development-log.md).
 
 ## Railway deployment
 
