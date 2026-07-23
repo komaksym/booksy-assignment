@@ -65,11 +65,7 @@ def test_detail_localizes_history_while_preserving_exact_utc(client, app: FastAP
     assert imported is not None
     timestamp = "2026-07-23T00:44:55.385815+00:00"
     app.state.hardware.update(
-        {
-            "rental_history": [
-                {"type": "rent", "user_id": viewer["id"], "occurred_at": timestamp}
-            ]
-        },
+        {"rental_history": [{"type": "rent", "user_id": viewer["id"], "occurred_at": timestamp}]},
         Query().id == imported["id"],
     )
     _login(client, str(viewer["email"]), "user-password")
